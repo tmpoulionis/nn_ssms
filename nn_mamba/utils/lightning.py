@@ -10,7 +10,7 @@ class LightningMamba(L.LightningModule):
         self.optimizer = optimizer
         self.opt_hyperparams = opt_hyperparams if opt_hyperparams is not None else {}
         self.scheduler_config = scheduler_config
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['model', 'loss_fn'])
         
     def forward(self, x):
         return self.model(x)
@@ -18,19 +18,19 @@ class LightningMamba(L.LightningModule):
     def training_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
         metrics = {'train_loss': loss, 'train_acc': acc}
-        self.log_dict(metrics, prog_bar=True)
+        self.log_dict(metrics, prog_bar=True, on_epoch=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
         metrics = {'val_loss': loss, 'val_acc': acc}
-        self.log_dict(metrics, prog_bar=True)
+        self.log_dict(metrics, prog_bar=True, on_epoch=True)
         return metrics
         
     def test_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
         metrics = {'test_loss': loss, 'test_acc': acc}
-        self.log_dict(metrics, prog_bar=True)
+        self.log_dict(metrics, prog_bar=True, on_epoch=True)
         return metrics
     
     def _shared_eval_step(self, batch, batch_idx):
@@ -60,3 +60,4 @@ class LightningMamba(L.LightningModule):
                     "frequency": 1
                 }
             }
+            

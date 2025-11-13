@@ -1,2 +1,4 @@
 nn_mamba/data
 .vscode
+nn_mamba/checkpoints
+nn_mamba/wandb_logs

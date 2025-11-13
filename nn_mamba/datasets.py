@@ -3,6 +3,7 @@ import torch
 import torchaudio
 import torchaudio.datasets as datasets
 from torch.utils.data import DataLoader, random_split
+from torch.nn.utils.rnn import pad_sequence
 
 class SCDataset(datasets.SPEECHCOMMANDS):
     def __init__(self, root, subset, mel_transform=True, n_mels=64, n_fft=400, hop_length=150, filter_labels=None):
@@ -96,7 +97,7 @@ def get_dataloaders(
         os.makedirs(root)
     
     if dataset_name.lower() == "speechcommands":
-        print(f"Loading {dataset_name.lower()} dataset...")
+        print(f"\t Loading {dataset_name.lower()} dataset...")
         
         training_data = SCDataset(
             root=root, subset="training", mel_transform=mel_transform,
@@ -112,7 +113,7 @@ def get_dataloaders(
         )
     
     elif dataset_name.lower() == "sc09":
-        print(f"Loading {dataset_name.lower()} dataset...")
+        print(f"\t Loading {dataset_name.lower()} dataset...")
         
         filter_labels = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 
@@ -135,20 +136,33 @@ def get_dataloaders(
     else:
         raise ValueError(f"Dataset '{dataset_name}', is not supported.")
     
-    print(f"Creating DataLoaders...")
-    train_loader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(validation_data, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
-    print(f"Dataloaders created.")
+    print(f"\t Creating DataLoaders...")
+    train_loader = DataLoader(training_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(validation_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=False, num_workers=num_workers)
+    test_loader = DataLoader(test_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=False, num_workers=num_workers)
+    print(f"\t Dataloaders created.")
     
-    sample_waveform, _ = training_data[0]
+    data_iter = iter(train_loader)
+    sample, _ = next(data_iter)
     return {
         "train_loader": train_loader,
         "val_loader": val_loader,
         "test_loader": test_loader,
         "num_classes": training_data.num_classes,
         "labels": training_data.get_labels(),
-        "input_shape": sample_waveform.shape,
-        "feature_dim": sample_waveform.shape[0],
-        "sequence_length": sample_waveform.shape[-1]
+        "input_shape": sample.shape,
+        "feature_dim": sample.shape[-1],
+        "sequence_length": sample.shape[1]
     }
+
+def custom_mamba_collate(batch):
+    """
+    Pads sequences in a batch to the maximum length.
+    Expects batch elements to be (data, label).
+    """
+    data_tensors =[item[0].T for item in batch] # Keep transposed since the model expects (B, L, D)
+    labels = torch.as_tensor([item[1] for item in batch])
+    
+    padded_data = pad_sequence(data_tensors, batch_first=True)
+    
+    return padded_data, labels

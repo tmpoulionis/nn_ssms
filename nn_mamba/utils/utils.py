@@ -1,3 +1,4 @@
+import os
 import torch
 import random
 import torchinfo
@@ -5,6 +6,7 @@ import numpy as np
 import lightning as L
 from pathlib import Path
 import json
+import wandb
 
 def set_seed(seed: int = 42):
     """
@@ -45,5 +47,43 @@ def count_parameters(model):
     }
     
 def model_summary(model):
-    torchinfo.summary(model)
+    return torchinfo.summary(model)
 
+def format_time(seconds):
+    """Format seconds into readable time string."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    
+    if hours > 0:
+        return f"{hours}h {minutes}m {secs}s"
+    elif minutes > 0:
+        return f"{minutes}m {secs}s"
+    else:
+        return f"{secs}s"
+    
+def handle_wandb_login():
+    """Prompts the user for W&B logging preference and handles the login."""
+    print("\n--- Weights & Biases (W&B) Configuration ---")
+    print("Do you want to enable W&B logging for this run?")
+    print("(1) Log In / Use Existing Account")
+    print("(2) Skip Logging (Run Offline)")
+    
+    usrname = input("Please enter your W&B username: ")
+    choice = input("Enter your choice (1 or 2): ")
+    
+    if choice == "1":        
+        try:
+            wandb.login(relogin=False)
+            print("W&B login successful!")
+        except Exception as e:
+            print(f"W&B login failed: {e}. Running offline instead.")
+    elif choice == "2":
+        print("W&B logging skipped. The run will proceed without tracking.")
+        # Set WANDB_MODE to offline to prevent automatic logging
+        os.environ["WANDB_MODE"] = "offline"
+    else:
+        print("Invalid choice. Running offline.")
+        os.environ["WANDB_MODE"] = "offline"
+    
+    return usrname

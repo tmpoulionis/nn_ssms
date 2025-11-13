@@ -36,7 +36,11 @@ config = {
         "weight_decay": 0.1,
         "betas": (0.9, 0.95)
     },
-    "seed": 42
+    "seed": 42,
+    "wandb": {
+        "project": None,
+        "name": None
+    }
 }
 
 def get_config():
