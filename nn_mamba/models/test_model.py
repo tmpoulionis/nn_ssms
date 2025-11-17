@@ -23,6 +23,7 @@ class MambaModel(nn.Module):
         out_activation: str=None,
         dropout: float=0.1,
         use_layernorm: bool=False,
+        return_last_state: bool=False,
         **kwargs
     ):
         super().__init__()
@@ -31,6 +32,7 @@ class MambaModel(nn.Module):
         self.num_layers = num_layers
         self.d_model = d_model
         self.d_out = d_out if d_out is not None else d_model
+        self.return_last_state = return_last_state
         
         self.mamba_layers = nn.ModuleList([
             Mamba(
@@ -77,14 +79,15 @@ class MambaModel(nn.Module):
             x = mamba_block(x)
         
         x = self.final_norm(x)
-            
-        if self.head is not None:
-            b, l, d = x.shape
-            x = rearrange(x, 'b l d -> (b l) d')
-            x = self.head(x)
-            x = rearrange(x, '(b l) d -> b l d', b=b)
+        last_state = x[:, -1, :] # (B, D)
         
-        return x
+        if self.head is not None:
+            if self.return_last_state:
+                return self.head(last_state), last_state 
+            else:
+                return self.head(last_state) # (B, D_out)
+        else:
+            return x
         
     def get_last_hidden_state(self, x):
         """"

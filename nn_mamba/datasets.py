@@ -137,9 +137,9 @@ def get_dataloaders(
         raise ValueError(f"Dataset '{dataset_name}', is not supported.")
     
     print(f"\t Creating DataLoaders...")
-    train_loader = DataLoader(training_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(validation_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=False, num_workers=num_workers)
-    test_loader = DataLoader(test_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(training_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=True, num_workers=num_workers, pin_memory=True)
+    val_loader = DataLoader(validation_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=False, num_workers=num_workers, pin_memory=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, collate_fn=custom_mamba_collate, shuffle=False, num_workers=num_workers, pin_memory=True)
     print(f"\t Dataloaders created.")
     
     data_iter = iter(train_loader)

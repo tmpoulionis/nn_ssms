@@ -4,7 +4,7 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from models.test_model import MambaModel
-from nn_mamba.utils.lightning import LightningMamba
+from utils.lightning import LightningMamba
 from config import get_config
 from torch.optim.lr_scheduler import LambdaLR
 from utils.utils import set_seed, model_summary, format_time, handle_wandb_login

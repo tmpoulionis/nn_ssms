@@ -35,8 +35,7 @@ class LightningMamba(L.LightningModule):
     
     def _shared_eval_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x) # (B, L, D_out)
-        y_hat = torch.mean(y_hat, dim=1)  # (B, D_out) pooling over sequence length
+        y_hat = self.model(x) # (B, L, D) or (B, D_out)
         loss = self.loss_fn(y_hat, y)
         acc = accuracy(y_hat, y, task="multiclass", num_classes=self.model.d_out)
         return loss, acc
