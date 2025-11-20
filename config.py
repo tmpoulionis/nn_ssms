@@ -1,21 +1,23 @@
 config = {
     "model": {
-        "num_layers": 4,
+        "num_layers": 2,
         "d_model": 64,
+        "mamba_activation": 'pelulike',
         "d_state": 16,
         "d_conv": 4,
         "expand": 2,
+        "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
-        # "d_out": 10, 
-        "activation": "gelu",
+        "mlp_act": "pelulike",
         "out_activation": None,
         "dropout": 0.1,
-        "use_layernorm": False,
-        "return_last_state": False
+        "use_layernorm": True,
+        "return_last_state": False,
+        "use_fast_path": False
     },
     "trainer": {
-        "max_epochs": None,
+        "max_epochs": 30,
         "max_steps": 200000,
         "accelerator": "auto",
         "devices": 1,
@@ -23,12 +25,13 @@ config = {
         "gradient_clip_val": 0.1,
         "max_time": None,
         "enable_progress_bar": True,
-        "log_every_n_steps": None
+        "log_every_n_steps": None,
+        "detect_anomaly": True
     },
     "dataset": {
         "dataset_name": "sc09",
         "root": "./data",
-        "batch_size": 16,
+        "batch_size": 128,
         "mel_transform": True,
         "n_mels": 64,
         "n_fft": 400,
@@ -40,7 +43,7 @@ config = {
         "betas": (0.9, 0.95),
         "eps": 1e-8
     },
-    "seed": 42,
+    "seed": None,
     "wandb": {
         "project": None,
         "name": None,

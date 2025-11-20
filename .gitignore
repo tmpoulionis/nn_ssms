@@ -1,4 +1,8 @@
-nn_mamba/data
+__pycache__
 .vscode
-nn_mamba/checkpoints
-nn_mamba/wandb_logs
+checkpoints
+data
+wandb_logs
+dataloaders/datasets/__pycache__
+models/__pycache__
+utils/ __pycache__

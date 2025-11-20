@@ -51,8 +51,9 @@ class SCDataset(datasets.SPEECHCOMMANDS):
             waveform = waveform.squeeze(0) # (n_mels, time)
         
         label_index = self.label_to_index[label]
+        norm_waveform = (waveform - waveform.mean()) / (waveform.std() + 1e-8) # Normalize
         
-        return waveform, label_index
+        return norm_waveform, label_index
     
     def __len__(self):
         return len(self.data_indices)

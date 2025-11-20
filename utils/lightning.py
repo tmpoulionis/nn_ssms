@@ -59,4 +59,10 @@ class LightningMamba(L.LightningModule):
                     "frequency": 1
                 }
             }
-            
+    
+    # # Debugging
+    # def on_fit_start(self):
+    #     def hook(module, input, output):
+    #         print(f"[HOOK] Activation {module} input mean = ({input[0].mean().item():.2f})")
+        
+    #     self.model.mamba.act.register_forward_hook(hook)

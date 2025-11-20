@@ -1,4 +1,4 @@
-import datasets
+import data
 import torch
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
@@ -7,7 +7,7 @@ from models.test_model import MambaModel
 from utils.lightning import LightningMamba
 from config import get_config
 from torch.optim.lr_scheduler import LambdaLR
-from utils.utils import set_seed, model_summary, format_time, handle_wandb_login
+from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config
 import wandb
 import time
 torch.set_float32_matmul_precision('medium') # or 'high'
@@ -22,7 +22,8 @@ def train(config):
     
     start_time = time.time()
     # Set seed for reproducibility
-    set_seed(config["seed"])
+    if config["seed"]:
+        set_seed(config["seed"])
     
     # Parse config
     MODEL_CONFIG = config["model"]
@@ -33,11 +34,11 @@ def train(config):
 
     # ------- Load Dataset and create DataLoaders -------
     print("\n[1/6] Preparing DataLoaders...")
-    data = datasets.get_dataloaders(**DATASET_CONFIG)
-    train_loader = data["train_loader"]
-    val_loader = data["val_loader"]
-    test_loader = data["test_loader"]
-    num_classes = data["num_classes"]
+    dataset = data.get_dataloaders(**DATASET_CONFIG)
+    train_loader = dataset["train_loader"]
+    val_loader = dataset["val_loader"]
+    test_loader = dataset["test_loader"]
+    num_classes = dataset["num_classes"]
     if TRAINER_CONFIG["max_epochs"] is not None:
         total_steps = len(train_loader) * TRAINER_CONFIG["max_epochs"]
         if TRAINER_CONFIG["max_steps"] is not None:
@@ -47,17 +48,10 @@ def train(config):
             total_steps = TRAINER_CONFIG["max_steps"]
         except: 
             raise ValueError("Either max_steps or max_epochs must be defined.")
-        
-    print(f"  ✓ Dataset: {DATASET_CONFIG['dataset_name']}")
-    print(f"  ✓ Classes: {data['num_classes']}")
-    print(f"  ✓ Input shape: {data['input_shape']}")
-    print(f"  ✓ Features: {data['feature_dim']}")
-    print(f"  ✓ Sequence Length: {data['sequence_length']}")
     
     # ------- Model -------
     print("\n[2/6] Constructing Model...")
     model = MambaModel(**MODEL_CONFIG, d_out=num_classes)
-    model_summary(model)
     
     # ------- W&B Logger -------
     print("\n[3/6] Setting up W&B Logger...")
@@ -82,8 +76,8 @@ def train(config):
             filename="best-{epoch:02d}-{val_acc:.4f}",
             monitor="val_acc",
             mode="max",
-            save_top_k=3,
-            save_last=True
+            save_top_k=1,
+            save_last=False
         ),
         EarlyStopping(
             monitor="val_loss",
@@ -92,10 +86,6 @@ def train(config):
             verbose=True
         )
     ]
-    
-    print(f"  ✓ Learning rate monitor")
-    print(f"  ✓ Model checkpointing (save top 3)")
-    print(f"  ✓ Early stopping (patience=20)")
     
     # ------- Scheduler -------
     warmup_steps = int(0.1 * total_steps)
@@ -128,24 +118,38 @@ def train(config):
         callbacks=callbacks,
     )
     
-    print(f"  ✓ Max steps: {TRAINER_CONFIG['max_steps'] if TRAINER_CONFIG['max_steps'] else 'N/A'}")
-    print(f"  ✓ Max epochs: {TRAINER_CONFIG['max_epochs'] if TRAINER_CONFIG['max_epochs'] else 'N/A'}")
-    print(f"  ✓ Accelerator: {TRAINER_CONFIG['accelerator']}")
-    print(f"  ✓ Gradient clip: {TRAINER_CONFIG['gradient_clip_val']}")
+    # ------- Print Config -------
+    print("\n" + "-"*40)
+    print("TRAINING CONFIGURATION")
+    print("-"*40)
     
-    # ------- Training -------
-    print("\n" + "="*20)
+    print("\n"+  "--------- Model ---------")
+    model_summary(model)
+    print_config(MODEL_CONFIG, ["all"])
+    
+    print("\n"+  "--------- Callbacks ---------")
+    print(f"   ✓ Learning rate monitor")
+    print(f"   ✓ Model checkpointing (save best)")
+    print(f"   ✓ Early stopping (patience=20)")
+    
+    print("\n"+  "--------- Data & Trainer ---------")
+    print_config(DATASET_CONFIG, ["dataset_name", "batch_size"])
+    print_config(TRAINER_CONFIG, ["all"])
+    print_config(dataset, ["num_classes", "labels", "input_shape", "feature_dim", "sequence_length"])
+    
+    # ------------ Training ------------
+    print("\n" + "="*70)
     print("STARTING TRAINING")
-    print("="*20 + "\n")
+    print("="*70 + "\n")
     
     try:
         trainer.fit(lightning_module, train_loader, val_loader)
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user!")
         
-    print("\n" + "="*20)
+    print("\n" + "="*70)
     print("RUNNING TEST EVALUATION")
-    print("="*20 + "\n")
+    print("="*70 + "\n")
     
     trainer.test(lightning_module, test_loader, ckpt_path="best")
     
