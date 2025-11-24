@@ -17,28 +17,53 @@ class LightningMamba(L.LightningModule):
     
     def training_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
-        metrics = {'train_loss': loss, 'train_acc': acc}
+        if self.model.task == 'generation':
+            metrics = {"train_loss": loss, 'train_per': acc}
+        else:
+            metrics = {'train_loss': loss, 'train_acc': acc}
+            
         self.log_dict(metrics, prog_bar=True, on_epoch=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
-        metrics = {'val_loss': loss, 'val_acc': acc}
+        if self.model.task == 'generation':
+            metrics = {"val_loss": loss, 'val_per': acc}
+        else:
+            metrics = {'val_loss': loss, 'val_acc': acc}
+            
         self.log_dict(metrics, prog_bar=True, on_epoch=True)
         return metrics
         
     def test_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
-        metrics = {'test_loss': loss, 'test_acc': acc}
+        if self.model.task == 'generation':
+            metrics = {"test_loss": loss, 'test_per': acc}
+        else:
+            metrics = {'test_loss': loss, 'test_acc': acc}
+            
         self.log_dict(metrics, prog_bar=True, on_epoch=True)
         return metrics
     
     def _shared_eval_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self.model(x) # (B, L, D) or (B, D_out)
-        loss = self.loss_fn(y_hat, y)
-        acc = accuracy(y_hat, y, task="multiclass", num_classes=self.model.d_out)
-        return loss, acc
+        if self.model.task == 'generation':
+            x, y = batch # (B, L)
+            logits = self.model(x) # (B, L, vocab_size)
+            
+            # Flatten for cross_entropy
+            logits_flat = logits.reshape(-1, self.model.vocab_size) # (B*L, vocab_size)
+            targets_flat = y.reshape(-1) # (B*L)
+            
+            loss = self.loss_fn(logits_flat, targets_flat)
+            perplexity = torch.exp(loss)
+            return loss, perplexity
+        
+        else:
+            x, y = batch
+            y_hat = self.model(x) # (B, D_out)
+            loss = self.loss_fn(y_hat, y)
+            acc = accuracy(y_hat, y, task="multiclass", num_classes=self.model.d_out)
+            return loss, acc
     
     def configure_optimizers(self):
         optimizer = self.optimizer(self.model.parameters(), **self.opt_hyperparams)

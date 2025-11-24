@@ -2,6 +2,8 @@ config = {
     "model": {
         "num_layers": 2,
         "d_model": 64,
+        'vocab_size': None,
+        'task': 'classification',
         "mamba_activation": 'pelulike',
         "d_state": 16,
         "d_conv": 4,
@@ -30,12 +32,7 @@ config = {
     },
     "dataset": {
         "dataset_name": "sc09",
-        "root": "./data",
         "batch_size": 128,
-        "mel_transform": True,
-        "n_mels": 64,
-        "n_fft": 400,
-        "hop_length": 150
     },
     "optimizer": { # Using AdamW
         "lr": 1e-3,
@@ -51,6 +48,3 @@ config = {
         "mode": 1 #(1: online or 2: offline)
     }
 }
-
-def get_config():
-    return config

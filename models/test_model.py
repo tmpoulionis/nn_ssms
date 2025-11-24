@@ -14,6 +14,8 @@ class MambaModel(nn.Module):
         self,
         num_layers: int,
         d_model: int,
+        vocab_size: int=None,
+        task: str='classification',
         mamba_activation: str="silu",
         d_state: int=16,
         d_conv: int=4,
@@ -31,16 +33,22 @@ class MambaModel(nn.Module):
     ):
         super().__init__()
         
-        "Mamba Stack"
+        # Mamba Stack
         self.num_layers = num_layers
         self.d_model = d_model
+        self.vocab_size = vocab_size
+        self.task = task
         self.d_out = d_out if d_out is not None else d_model
         self.return_last_state = return_last_state
         self.use_prenorm = use_prenorm
         
+        # Embedding layer
+        if task == 'generation':
+            self.embedding = nn.Embedding(vocab_size, d_model)
+        
         # Create Mamba layers with pre-normalization
         self.mamba_layers = nn.ModuleList()
-        self.layer_norms = nn.ModuleList()  # NEW: Layer norms before each Mamba block
+        self.layer_norms = nn.ModuleList()  # Layer norms before each Mamba block
         
         for _ in range(self.num_layers):
             if self.use_prenorm:
@@ -59,34 +67,41 @@ class MambaModel(nn.Module):
             
         self.final_norm = nn.LayerNorm(d_model) if use_final_norm else nn.Identity()
         
-        "Classification head"
-        mlp_layers = []
-        if mlp_dims is None:
-            self.head = None
+        # Generation head
+        if task == 'generation':
+            assert vocab_size is not None, "vocab_size must be specified for generation."
+            self.head = nn.Linear(d_model, vocab_size, bias=None)
         else:
-            assert mlp_dims[0] == d_model, "First dim in mlp_dims must be d_model."
-            assert mlp_dims[-1] == d_out, "Last dim in mlp_dims must be num_classes."
-        
-            for i in range(len(mlp_dims) - 1):
-                mlp_layers.append(nn.Linear(mlp_dims[i], mlp_dims[i+1]))
-                if i < len(mlp_dims) - 2:
-                    if use_layernorm:
-                        mlp_layers.append(nn.LayerNorm(mlp_dims[i+1]))
-                    mlp_layers.append(Activation(mlp_act))
+        # Classification head
+            mlp_layers = []
+            if mlp_dims is None:
+                self.head = None
+            else:
+                assert mlp_dims[0] == d_model, "First dim in mlp_dims must be d_model."
+                assert mlp_dims[-1] == d_out, "Last dim in mlp_dims must be num_classes."
 
-                    if dropout > 0:
-                        mlp_layers.append(nn.Dropout(dropout))
-                else:
-                    # Optional output activation
-                    if out_activation is not None:
-                        mlp_layers.append(Activation(out_activation))
-                    
-        self.head = nn.Sequential(*mlp_layers)
+                for i in range(len(mlp_dims) - 1):
+                    mlp_layers.append(nn.Linear(mlp_dims[i], mlp_dims[i+1]))
+                    if i < len(mlp_dims) - 2:
+                        if use_layernorm:
+                            mlp_layers.append(nn.LayerNorm(mlp_dims[i+1]))
+                        mlp_layers.append(Activation(mlp_act))
+
+                        if dropout > 0:
+                            mlp_layers.append(nn.Dropout(dropout))
+                    else:
+                        # Optional output activation
+                        if out_activation is not None:
+                            mlp_layers.append(Activation(out_activation))
+
+            self.head = nn.Sequential(*mlp_layers)
         
     def forward(self, x):
         '''
         x: (B, L, D)
         '''
+        if self.task == 'generation':
+            x = self.embedding(x) # (B, L) --> (B, L, d_model)
         
         for i, mamba_block in enumerate(self.mamba_layers):
             if self.use_prenorm:
@@ -96,17 +111,24 @@ class MambaModel(nn.Module):
                 x = mamba_block(x) + residual # Residual connection
             else:
                 x = mamba_block(x) # (B, L, D)
-        
+                
         x = self.final_norm(x)
-        last_state = x[:, -1, :] # (B, D)
-        
-        if self.head is not None:
-            if self.return_last_state:
-                return self.head(last_state), last_state 
-            else:
-                return self.head(last_state) # (B, D_out)
+            
+        # Generation forward pass
+        if self.task == 'generation':
+            logits = self.head(x) # (B, L, vocab_size)
+            return logits
         else:
-            return x
+        # Classification forward pass
+            last_state = x[:, -1, :] # (B, D)
+
+            if self.head is not None:
+                if self.return_last_state:
+                    return self.head(last_state), last_state 
+                else:
+                    return self.head(last_state) # (B, D_out)
+            else:
+                return x
         
     def get_last_hidden_state(self, x):
         """"

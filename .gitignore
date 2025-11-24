@@ -3,6 +3,7 @@ __pycache__
 checkpoints
 data
 wandb_logs
+dataloaders/__pycache__
 dataloaders/datasets/__pycache__
 models/__pycache__
 utils/ __pycache__

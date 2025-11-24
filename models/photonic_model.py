@@ -14,7 +14,7 @@ class PhotonicMamba(nn.Module):
         
         self.mamba = Mamba(**mamba_kwargs)
         
-        self.mamba.activation = "silu"
+        self.mamba.activation = "silu" # To avoid the 'assert' check in their source code
         self.mamba.act = Activation(mamba_activation)
         
     def forward(self, hidden_states, inference_params=None):

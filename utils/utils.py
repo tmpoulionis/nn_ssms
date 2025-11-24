@@ -7,7 +7,7 @@ import lightning as L
 from pathlib import Path
 import json
 import wandb
-from config import get_config
+import importlib
 
 def set_seed(seed: int = 42):
     """
@@ -63,19 +63,18 @@ def format_time(seconds):
     else:
         return f"{secs}s"
     
-def handle_wandb_login():
-    config = get_config()
+def handle_wandb_login(config):
     """Prompts the user for W&B logging preference and handles the login."""
     print("\n--- Weights & Biases (W&B) Configuration ---")
     
-    if config["wandb"]["username"]:
-        usrname = config["wandb"]["username"]
+    if config["username"]:
+        usrname = config["username"]
         print(f"W&B username: {usrname}")
     else:
         usrname = input("Please enter your W&B username: ")
     
-    if config["wandb"]["mode"] == 1:
-        choice = str(config["wandb"]["mode"])
+    if config["mode"] == 1:
+        choice = str(config["mode"])
     else:
         print("Do you want to enable W&B online logging for this run?")
         print("(1) Log In / Use Existing Account")
@@ -107,3 +106,7 @@ def print_config(config: dict, list: list):
     else:
         for param, key in config.items():
             print(f"   ✓ {param}: {key}")
+            
+def load_config(name: str):
+    module = importlib.import_module(f"experiments.{name}")
+    return module.config

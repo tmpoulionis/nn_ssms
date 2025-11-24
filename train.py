@@ -1,17 +1,19 @@
-import data
+import argparse
+import dataloaders.data as data
 import torch
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from models.test_model import MambaModel
 from utils.lightning import LightningMamba
-from config import get_config
 from torch.optim.lr_scheduler import LambdaLR
-from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config
+from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config, load_config
 import wandb
 import time
+
 torch.set_float32_matmul_precision('medium') # or 'high'
 
+    
 def train(config):
     """
     Main training function with full W&B integration.
@@ -36,7 +38,7 @@ def train(config):
     print("\n[1/6] Preparing DataLoaders...")
     dataset = data.get_dataloaders(**DATASET_CONFIG)
     train_loader = dataset["train_loader"]
-    val_loader = dataset["val_loader"]
+    val_loader = dataset["valid_loader"]
     test_loader = dataset["test_loader"]
     num_classes = dataset["num_classes"]
     if TRAINER_CONFIG["max_epochs"] is not None:
@@ -55,7 +57,7 @@ def train(config):
     
     # ------- W&B Logger -------
     print("\n[3/6] Setting up W&B Logger...")
-    usrname = handle_wandb_login()
+    usrname = handle_wandb_login(WANDB_CONFIG)
 
     wandb_logger = WandbLogger(
         project=WANDB_CONFIG["project"],
@@ -135,7 +137,7 @@ def train(config):
     print("\n"+  "--------- Data & Trainer ---------")
     print_config(DATASET_CONFIG, ["dataset_name", "batch_size"])
     print_config(TRAINER_CONFIG, ["all"])
-    print_config(dataset, ["num_classes", "labels", "input_shape", "feature_dim", "sequence_length"])
+    print_config(dataset, ["input_shape", "num_classes"])
     
     # ------------ Training ------------
     print("\n" + "="*70)
@@ -161,14 +163,26 @@ def train(config):
     return trainer, lightning_module
     
     
+import math
+from torch.optim.lr_scheduler import LambdaLR
+
 def create_scheduler(optimizer, total_steps, warmup_steps=0):
     def lr_lambda(current_step):
+        # Linear Warmup
         if current_step < warmup_steps:
             return float(current_step) / float(max(1, warmup_steps))
-        else:
-            return 1.0
+        
+        # Cosine Decay
+        progress = (current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        return 0.5 * (1.0 + math.cos(math.pi * progress))
+    
     return LambdaLR(optimizer, lr_lambda)
 
+
 if __name__ == "__main__":
-    config = get_config()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--experiment', '-e', required=True, help="Which experiment config file from ./experiments to run.")
+    args = parser.parse_args()
+    
+    config = load_config(args.experiment)
     trainer, model = train(config)
