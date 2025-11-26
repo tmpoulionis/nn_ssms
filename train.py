@@ -178,7 +178,6 @@ def create_scheduler(optimizer, total_steps, warmup_steps=0):
     
     return LambdaLR(optimizer, lr_lambda)
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment', '-e', required=True, help="Which experiment config file from ./experiments to run.")

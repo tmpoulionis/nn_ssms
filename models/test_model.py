@@ -16,7 +16,9 @@ class MambaModel(nn.Module):
         d_model: int,
         vocab_size: int=None,
         task: str='classification',
-        mamba_activation: str="silu",
+        conv_activation: str="silu",
+        delta_activation=None,
+        gate_activation=None,
         d_state: int=16,
         d_conv: int=4,
         expand: int=2,
@@ -57,7 +59,9 @@ class MambaModel(nn.Module):
             self.mamba_layers.append(
                 PhotonicMamba(
                     d_model=d_model,
-                    mamba_activation=mamba_activation,
+                    conv_activation=conv_activation,
+                    delta_activation=delta_activation,
+                    gate_activation=gate_activation,
                     d_state=d_state,
                     d_conv=d_conv,
                     expand=expand,

@@ -1,0 +1,19 @@
+{
+    // VS Code Debugging Configuration
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug train.py with -e sc09_class",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                // The argument for the 'experiment' flag
+                "-e", 
+                "sc09_class"
+            ],
+        }
+    ]
+}

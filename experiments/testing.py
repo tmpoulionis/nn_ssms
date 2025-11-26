@@ -1,25 +1,25 @@
 config = {
     "model": {
-        "num_layers": 6,
-        "d_model": 256,
-        'vocab_size': 18, # ['A', 'T', 'C', 'G', 'N', 'a', 't', 'c', 'g', 'n', '.'] + 7 special tokens
-        'task': 'generation',
-        "mamba_activation": 'silu',
+        "num_layers": 2,
+        "d_model": 64,
+        'vocab_size': None,
+        'task': 'classification',
+        "mamba_activation": 'pelulike',
         "d_state": 16,
         "d_conv": 4,
         "expand": 2,
         "use_prenorm": True,
         "use_final_norm": True,
-        "mlp_dims": None,
-        "mlp_act": None,
+        "mlp_dims": [64, 128, 10],
+        "mlp_act": "pelulike",
         "out_activation": None,
-        "dropout": None,
-        "use_layernorm": False,
+        "dropout": 0.1,
+        "use_layernorm": True,
         "return_last_state": False,
         "use_fast_path": False
     },
     "trainer": {
-        "max_epochs": None,
+        "max_epochs": 30,
         "max_steps": 200000,
         "accelerator": "auto",
         "devices": 1,
@@ -31,12 +31,11 @@ config = {
         "detect_anomaly": True
     },
     "dataset": {
-        "dataset_name": "hg38",
-        "batch_size": 8,
-        "max_length": 2**14
+        "dataset_name": "sc09",
+        "batch_size": 128,
     },
     "optimizer": { # Using AdamW
-        "lr": 8e-3,
+        "lr": 1e-3,
         "weight_decay": 0.1,
         "betas": (0.9, 0.95),
         "eps": 1e-8
