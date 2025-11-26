@@ -381,7 +381,7 @@ __device__ __forceinline__ void photonic_gate_activation_bwd(
     float dout_val,        // Gradient of loss w.r.t. final output
     PhotonicActivationType act_type,
     float& dz_out,         // Output: gradient w.r.t. z
-    float& dout_scaled     // Output: gradient to pass to SSM backward
+    float& dout_vals     // Output: gradient to pass to SSM backward
 ) {
     switch (act_type) {
         case PhotonicActivationType::STANDARD: {
@@ -391,66 +391,66 @@ __device__ __forceinline__ void photonic_gate_activation_bwd(
             // d(out * silu(z))/dz = out * silu'(z) = out * sigmoid(z) * (1 + z*(1-sigmoid(z)))
             dz_out = dout_val * out_val * z_sigmoid * (1.0f + z_val * (1.0f - z_sigmoid));
             // d(out * silu(z))/d(out) = silu(z)
-            dout_scaled = dout_val * z_silu;
+            dout_vals = dout_val * z_silu;
             break;
         }
         case PhotonicActivationType::PSIGMOID: {
             PSigmoidParams p;
             float act_val = psigmoid_fwd(z_val, p);
             dz_out = dout_val * out_val * psigmoid_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PSINUSOIDAL: {
             float act_val = psinusoidal_fwd(z_val);
             dz_out = dout_val * out_val * psinusoidal_bwd(z_val, 1.0f);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PTANHLIKE: {
             PTanhLikeParams p;
             float act_val = ptanhlike_fwd(z_val, p);
             dz_out = dout_val * out_val * ptanhlike_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PELULIKE: {
             PELULikeParams p;
             float act_val = pelulike_fwd(z_val, p);
             dz_out = dout_val * out_val * pelulike_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PINVELU: {
             PInvELUParams p;
             float act_val = pinvelu_fwd(z_val, p);
             dz_out = dout_val * out_val * pinvelu_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PDSINSQ: {
             PDSinSqParams p;
             float act_val = pdsinsq_fwd(z_val, p);
             dz_out = dout_val * out_val * pdsinsq_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PRESIN: {
             PReSinParams p;
             float act_val = presin_fwd(z_val, p);
             dz_out = dout_val * out_val * presin_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         case PhotonicActivationType::PEXPSIN: {
             PExpSinParams p;
             float act_val = pexpsin_fwd(z_val, p);
             dz_out = dout_val * out_val * pexpsin_bwd(z_val, 1.0f, p);
-            dout_scaled = dout_val * act_val;
+            dout_vals = dout_val * act_val;
             break;
         }
         default:
             dz_out = 0.0f;
-            dout_scaled = dout_val;
+            dout_vals = dout_val;
     }
 }

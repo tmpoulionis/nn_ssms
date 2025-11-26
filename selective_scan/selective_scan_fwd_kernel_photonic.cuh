@@ -250,6 +250,7 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
                         }
                     }
                 }
+                
                 // Initialize running total
                 scan_t running_prefix;
                 if constexpr (!kIsComplex) {
@@ -311,7 +312,7 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
                     
                     // MODIFIED: Use photonic activation for gating instead of silu
                     float gate_val = photonic_gate_activation_fwd(z_val, gate_act_type);
-                    out_vals[r][i] *= z_val;
+                    out_vals[r][i] *= gate_val;
                 }
                 __syncthreads();
                 store_output<Ktraits>(out_z + r * params.out_z_d_stride, out_vals[r], smem_store, params.seqlen - chunk * kChunkSize);

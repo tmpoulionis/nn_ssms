@@ -200,25 +200,24 @@ void selective_scan_bwd_kernel(SSMParamsBwd params) {
             load_input<Ktraits>(z, z_vals, smem_load, params.seqlen - chunk * kChunkSize);
             __syncthreads();
             load_input<Ktraits>(out, out_vals, smem_load, params.seqlen - chunk * kChunkSize);
-            float dz_vals[kNItems], z_silu_vals[kNItems];
+            float dz_vals[kNItems], z_activated_vals[kNItems];
             #pragma unroll
             for (int i = 0; i < kNItems; ++i) {
                 float z_val = z_vals[i];
-                float z_sigmoid_val = 1.0f / (1.0f + expf(-z_val));
-                z_silu_vals[i] = z_val * z_sigmoid_val;
-                dz_vals[i] = dout_vals[i] * float(out_vals[i]) * z_sigmoid_val
-                             * (1.0f + z_val * (1.0f - z_sigmoid_val));
-                dout_vals[i] *= z_silu_vals[i];
+                // Get the activated value for later use
+                z_activated_vals[i] = photonic_gate_activation_fwd(z_val, gate_act_type);
+                // Compute gradients using the backward function
+                photonic_gate_activation_bwd(
+                    z_val, float(out_vals[i]), dout_vals[i], gate_act_type, dz_vals[i], dout_vals[i]
+                );
             }
             __syncthreads();
             store_output<Ktraits>(dz, dz_vals, smem_store, params.seqlen - chunk * kChunkSize);
             if (params.out_z_ptr != nullptr) {  // Recompute and store out_z
                 float out_z_vals[kNItems];
                 #pragma unroll
-                for (int i = 0; i < kNItems; ++i) { out_z_vals[i] = float(out_vals[i]) * z_silu_vals[i]; }
-                // if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) {
-                    // printf("out_val=%f, z_silu_val = %f, out_z_val = %f\n", float(out_vals[0]), z_silu_vals[0], out_z_vals[0]);
-                // }
+                for (int i = 0; i < kNItems; ++i) { out_z_vals[i] = float(out_vals[i]) * z_activated_vals[i]; }
+
                 input_t *out_z = reinterpret_cast<input_t *>(params.out_z_ptr) + batch_id * params.out_z_batch_stride
                     + dim_id * params.out_z_d_stride + chunk * kChunkSize;
                 __syncthreads();
