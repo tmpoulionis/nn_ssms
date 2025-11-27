@@ -14,6 +14,23 @@ def get_dataloaders(
     **dataset_kwargs
     ):
 
+    """
+    Initializes and returns PyTorch DataLoaders for a specified dataset.
+
+    Args:
+        dataset_name (str): The name of the dataset (key in DATASET_REGISTRY)
+        root (str): Directory where dataset data is stored/downloaded
+        batch_size (int): Number of samples per batch
+        num_workers (int): Number of subprocesses to use for data loading
+        pin_memory (bool): If True, use CUDA pinned memory for faster transfers to GPU
+        **dataset_kwargs: Extra keyword arguments passed to the underlying create_dataset function
+
+    Returns:
+        dict: A dictionary containing:
+            - DataLoaders (train, valid, test) or (train, test)
+            - "input_shape" (list): The shape of a single input sample
+            - "num_classes" (int): The total number of classes in the dataset
+    """
     if dataset_name.lower() not in DATASET_REGISTRY:
         raise ValueError(
             f"Dataset '{dataset_name}' not supported. "
@@ -45,14 +62,14 @@ def get_dataloaders(
 
 def create_dataset(dataset_name: str, **kwargs) -> Dict[str, Dataset]:
     """
-    Factory function to create dataset instances.
+    Factory function to create dataset instances and determine the number of classes for the specified dataset in DATASET_REGISTRY
     
     Args:
-        dataset_name: Name of the dataset
-        **kwargs: Override parameters for the dataset
+        dataset_name (str): Name of the dataset
+        **kwargs: Parameters used to override the default configuration
     
     Returns:
-        Dataset instances
+        Dataset instances, number of classes
     """
     
     if dataset_name.lower() not in DATASET_REGISTRY:

@@ -5,6 +5,14 @@ import torchaudio.datasets as datasets
 from torch.nn.utils.rnn import pad_sequence
 
 class SCDataset(datasets.SPEECHCOMMANDS):
+    """
+    Custom PyTorch Dataset for the Speech Commands V0.02 dataset.
+    This class extends torchaudio.datasets.SPEECHCOMMANDS to:
+        - Apply MelSpectrogram transformation to the raw audio waveform if enabled.
+        - Allows filtering the dataset to include only a specific set of labels (e.g., 'sc09').
+        - Maps string labels to integer indices (0 to num_classes-1).
+    """
+    
     def __init__(self, subset, root='./data/speechcommands', mel_transform=True, n_mels=64, n_fft=400, hop_length=150, filter_labels=None):
         
         if not os.path.exists(root):

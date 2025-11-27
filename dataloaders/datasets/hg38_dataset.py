@@ -138,7 +138,11 @@ class FastaInterval():
 class HG38Dataset(torch.utils.data.Dataset):
 
     '''
-    Loop thru bed file, retrieve (chr, start, end), query fasta file for sequence.
+    Dataset for extracting genomic sequences from HG38.
+
+    Iterates through a BED file, retrieves (chr, start, end) intervals,
+    fetches sequences from the FASTA file, tokenizes them, and returns
+    (input, target) pairs for sequence modeling.
     
     '''
 
