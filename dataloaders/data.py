@@ -46,6 +46,7 @@ def get_dataloaders(
         dataloaders[f"{subset}_loader"]= DataLoader(
             dataset=dataset, 
             batch_size=batch_size, 
+            shuffle=(subset == 'train'),
             num_workers=num_workers, 
             pin_memory=pin_memory,
             collate_fn=data_config.collate_fn

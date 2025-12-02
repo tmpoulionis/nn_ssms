@@ -4,7 +4,7 @@ config = {
         "d_model": 256,
         'vocab_size': 18, # ['A', 'T', 'C', 'G', 'N', 'a', 't', 'c', 'g', 'n', '.'] + 7 special tokens
         'task': 'generation',
-        "mamba_activation": 'silu',
+        "conv_activation": 'silu',
         "d_state": 16,
         "d_conv": 4,
         "expand": 2,
@@ -16,24 +16,26 @@ config = {
         "dropout": None,
         "use_layernorm": False,
         "return_last_state": False,
-        "use_fast_path": False
+        "use_fast_path": True
     },
     "trainer": {
         "max_epochs": None,
         "max_steps": 200000,
         "accelerator": "auto",
-        "devices": 1,
+        "devices": 2,
         "enable_checkpointing": True,
         "gradient_clip_val": 0.1,
         "max_time": None,
         "enable_progress_bar": True,
         "log_every_n_steps": None,
-        "detect_anomaly": True
+        "detect_anomaly": False
     },
     "dataset": {
         "dataset_name": "hg38",
         "batch_size": 8,
-        "max_length": 2**14
+        "max_length": 2**14,
+        "num_workers": 4,
+        "pin_memory": True
     },
     "optimizer": { # Using AdamW
         "lr": 8e-3,

@@ -3,11 +3,13 @@ config = {
         "num_layers": 2,
         "d_model": 64,
         'vocab_size': None,
-        'task': 'classification',
-        "mamba_activation": 'pelulike',
         "d_state": 16,
         "d_conv": 4,
         "expand": 2,
+        'task': 'classification',
+        "conv_activation": 'pelulike',
+        # "delta_activation": 'softplus',
+        # "gate_activation": 'silu',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
@@ -37,8 +39,17 @@ config = {
     "optimizer": { # Using AdamW
         "lr": 1e-3,
         "weight_decay": 0.1,
-        "betas": (0.9, 0.95),
+        "betas": (0.9, 0.95),   
         "eps": 1e-8
+    },
+    "noise_injector": {
+        "noise_config": {
+            "input": True,
+            "weight": True,
+            "bias": True,
+            "output": True
+        },
+        "noise_std": 0.05
     },
     "seed": None,
     "wandb": {

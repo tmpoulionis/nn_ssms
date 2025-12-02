@@ -22,7 +22,7 @@ class LightningMamba(L.LightningModule):
         else:
             metrics = {'train_loss': loss, 'train_acc': acc}
             
-        self.log_dict(metrics, prog_bar=True, on_epoch=True)
+        self.log_dict(metrics, prog_bar=True, on_epoch=True, sync_dist=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -32,7 +32,7 @@ class LightningMamba(L.LightningModule):
         else:
             metrics = {'val_loss': loss, 'val_acc': acc}
             
-        self.log_dict(metrics, prog_bar=True, on_epoch=True)
+        self.log_dict(metrics, prog_bar=True, on_epoch=True, sync_dist=True)
         return metrics
         
     def test_step(self, batch, batch_idx):
@@ -42,7 +42,7 @@ class LightningMamba(L.LightningModule):
         else:
             metrics = {'test_loss': loss, 'test_acc': acc}
             
-        self.log_dict(metrics, prog_bar=True, on_epoch=True)
+        self.log_dict(metrics, prog_bar=True, on_epoch=True, sync_dist=True)
         return metrics
     
     def _shared_eval_step(self, batch, batch_idx):

@@ -42,7 +42,7 @@ config = {
         "betas": (0.9, 0.95),   
         "eps": 1e-8
     },
-    "seed": 42,
+    "seed": None,
     "wandb": {
         "project": None,
         "name": None,

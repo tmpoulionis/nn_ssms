@@ -18,10 +18,11 @@ class PhotonicMamba(nn.Module):
         **mamba_kwargs):
         super().__init__()
         
-        # Force use_fast_path to False
-        if mamba_kwargs["use_fast_path"] or "use_fast_path" not in mamba_kwargs:
-            warnings.warn("Photonic Mamba does not support 'use_fast_path'. Setting 'use_fast_path' to False...")
-            mamba_kwargs["use_fast_path"] = False
+        if not conv_activation == 'silu':
+            # Force use_fast_path to False
+            if mamba_kwargs["use_fast_path"] or "use_fast_path" not in mamba_kwargs:
+                warnings.warn("Photonic Mamba does not support 'use_fast_path'. Setting 'use_fast_path' to False...")
+                mamba_kwargs["use_fast_path"] = False
         
         self.mamba = Mamba(**mamba_kwargs)
         
@@ -30,7 +31,7 @@ class PhotonicMamba(nn.Module):
         # self.gate_activation = gate_activation
         
     def forward(self, hidden_states, inference_params=None):
-        return self.mamba.forward(hidden_states, inference_params)
+        return self.mamba(hidden_states, inference_params)
         # """
         # Forward pass with photonic activations.
         # We override the forward function to use our selective_scan_fn.
