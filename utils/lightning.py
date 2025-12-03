@@ -1,9 +1,10 @@
 import torch
 import lightning as L
 from torchmetrics.functional import accuracy
+from utils.noise_injection import NoiseInjector
 
 class LightningMamba(L.LightningModule):
-    def __init__(self, model, optimizer, loss_fn, scheduler_config=None, opt_hyperparams=None):
+    def __init__(self, model, optimizer, loss_fn, scheduler_config=None, opt_hyperparams=None, noise_injector_config=None):
         super().__init__()
         self.model = model
         self.loss_fn = loss_fn
@@ -12,9 +13,38 @@ class LightningMamba(L.LightningModule):
         self.scheduler_config = scheduler_config
         self.save_hyperparameters(ignore=['model', 'loss_fn'])
         
+        self.noise_injector = noise_injector_config["injector"]
+        self.noise_schedule = noise_injector_config["schedule"]
+        
     def forward(self, x):
         return self.model(x)
     
+    def on_train_epoch_start(self):
+        if self.noise_schedule["train"] and self.noise_injector is not None:
+            self.noise_injector.attach()
+
+    def on_validation_epoch_start(self):
+        if self.noise_injector is None:
+            return 
+        
+        if self.noise_schedule["eval"]:
+            self.noise_injector.attach()
+        else:
+            self.noise_injector.dettach()
+            
+    def on_test_epoch_start(self):
+        if self.noise_injector is None:
+            return 
+        
+        if self.noise_schedule["eval"]:
+            self.noise_injector.attach()
+        else:
+            self.noise_injector.dettach()
+    
+    def on_save_checkpoint(self, checkpoint):
+        if self.noise_injector is not None and self.noise_injector._is_attached:
+            self.noise_injector.dettach()
+            
     def training_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
         if self.model.task == 'generation':

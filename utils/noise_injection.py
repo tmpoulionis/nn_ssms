@@ -12,36 +12,68 @@ class NoiseInjector(nn.Module):
         self.model = model
         self.noise_config = noise_config
         self.noise_std = noise_std
-    
+        
+        self._hooks = []
+        self._is_attached = False
+        self._original_weights = {}
+        self._original_biases = {}
+        
     def _make_pre_hook(self, name: str):
         def pre_hook(module, x):
+            # Inject noise into input, weights, and biases
             if self.noise_config["input"]:
-                x = x + torch.randn_like(x) * self.noise_std
+                x = tuple(
+                    i + torch.randn_like(i) * self.noise_std
+                    if isinstance(i, torch.Tensor)
+                    else i
+                    for i in x
+                )
             
             if self.noise_config["weight"] and hasattr(module, 'weight'):
+                self._original_weights = module.weight.data.clone()
                 module.weight.data = module.weight.data + torch.randn_like(module.weight.data) * self.noise_std
             
             if self.noise_config["bias"] and hasattr(module, 'bias') and hasattr(module.bias, 'data'):
                 module.bias.data = module.bias.data + torch.randn_like(module.bias.data) * self.noise_std
+                self._original_biases = module.bias.data.clone()
                 
             return x
         return pre_hook
     
     def _make_post_hook(self, name: str):
         def post_hook(module, input, output):
+            # Restore original weights and biases
+            if self.noise_config["weight"] and hasattr(module, 'weight'):
+                module.weight.data = self._original_weights
+            if self.noise_config["bias"] and hasattr(module, 'bias') and hasattr(module.bias, 'data'):
+                module.bias.data = self._original_biases
+            
+            # Inject noise into output
             if self.noise_config["output"]:
                 output = output + torch.randn_like(output) * self.noise_std
             return output
         return post_hook
      
     def attach(self):
+        if self._is_attached:
+            return self
+        
         for name, module in self.model.named_modules():
-            module.register_forward_pre_hook(self._make_pre_hook(name))
-            module.register_forward_hook(self._make_post_hook(name))
+            if isinstance(module,  (nn.Linear, nn.Conv1d)):
+                pre_handle = module.register_forward_pre_hook(self._make_pre_hook(name))
+                post_handle = module.register_forward_hook(self._make_post_hook(name))
+                self._hooks.append(pre_handle)
+                self._hooks.append(post_handle)
+                
+        self._is_attached = True
+        return self
     
-    def detach(self):
-        for _, module in self.model.named_modules():
-            module._forward_pre_hooks.clear()
-            module._forward_hooks.clear()
-    
-    
+    def dettach(self):
+        for handle in self._hooks:
+            handle.remove()
+            
+        self._hooks = []
+        self._original_weights = {}
+        self._original_biases = {}
+        self._is_attached = False
+        return self

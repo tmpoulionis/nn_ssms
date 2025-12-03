@@ -43,15 +43,19 @@ config = {
         "eps": 1e-8
     },
     "noise_injector": {
+        "noise_schedule": {
+            "train": True,
+            "eval": True
+        },
         "noise_config": {
             "input": True,
             "weight": True,
             "bias": True,
             "output": True
         },
-        "noise_std": 0.05
+        "noise_std": 0.06
     },
-    "seed": None,
+    "seed": 42,
     "wandb": {
         "project": None,
         "name": None,

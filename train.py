@@ -6,6 +6,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from models.test_model import MambaModel
 from utils.lightning import LightningMamba
+from utils.noise_injection import NoiseInjector
 from torch.optim.lr_scheduler import LambdaLR
 from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config, load_config
 import wandb
@@ -32,6 +33,7 @@ def train(config):
     TRAINER_CONFIG = config["trainer"]
     DATASET_CONFIG = config["dataset"]
     OPTIMIZER_CONFIG = config["optimizer"]
+    NOISE_CONFIG = config["noise_injector"]
     WANDB_CONFIG = config["wandb"]
 
     # ------- Load Dataset and create DataLoaders -------
@@ -100,6 +102,16 @@ def train(config):
         }
     }
     
+    # ------- Noise Injector -------
+    noise_injector_config = {
+        "injector": NoiseInjector(
+            model=model,
+            noise_config=NOISE_CONFIG["noise_config"],
+            noise_std=NOISE_CONFIG["noise_std"]
+        ),
+        "schedule": NOISE_CONFIG["noise_schedule"]
+    }
+    
     # ------- Lightning Module -------
     print("\n[5/6) Setting up Lightning Module...")
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -109,7 +121,8 @@ def train(config):
         optimizer=torch.optim.AdamW,
         loss_fn=loss_fn,
         opt_hyperparams=OPTIMIZER_CONFIG,
-        scheduler_config=scheduler_config
+        scheduler_config=scheduler_config,
+        noise_injector_config=noise_injector_config
     )
     
     # ------- Trainer -------
@@ -171,10 +184,12 @@ def create_scheduler(optimizer, total_steps, warmup_steps=0):
         # Linear Warmup
         if current_step < warmup_steps:
             return float(current_step) / float(max(1, warmup_steps))
-        
+        # return 1.0
         # Cosine Decay
         progress = (current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-        return 0.5 * (1.0 + math.cos(math.pi * progress))
+        cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
+        
+        return cosine_decay
     
     return LambdaLR(optimizer, lr_lambda)
 
