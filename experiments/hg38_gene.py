@@ -32,8 +32,8 @@ config = {
     },
     "dataset": {
         "dataset_name": "hg38",
-        "batch_size": 8,
-        "max_length": 2**14,
+        "batch_size": 16,
+        "max_length": 2**13,
         "num_workers": 4,
         "pin_memory": True
     },
@@ -42,6 +42,19 @@ config = {
         "weight_decay": 0.1,
         "betas": (0.9, 0.95),
         "eps": 1e-8
+    },
+    "noise_injector": {
+        "noise_schedule": {
+            "train": False,
+            "eval": False
+        },
+        "noise_config": {
+            "input": True,
+            "weight": True,
+            "bias": True,
+            "output": True
+        },
+        "noise_std": 0.1
     },
     "seed": None,
     "wandb": {

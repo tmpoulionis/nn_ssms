@@ -33,7 +33,7 @@ def train(config):
     TRAINER_CONFIG = config["trainer"]
     DATASET_CONFIG = config["dataset"]
     OPTIMIZER_CONFIG = config["optimizer"]
-    NOISE_CONFIG = config["noise_injector"]
+    NOISE_CONFIG = config["noise_injector"] if "noise_injector" in config else None
     WANDB_CONFIG = config["wandb"]
 
     # ------- Load Dataset and create DataLoaders -------
@@ -65,21 +65,28 @@ def train(config):
         project=WANDB_CONFIG["project"],
         entity=usrname,
         name=WANDB_CONFIG["name"],
-        log_model="all",
-        save_dir="./wandb_logs"
+        log_model="all"
     )
     
     
     # ------- Callbacks -------
     print("\n[4/6] Setting up Callbacks...")
-    
+    if MODEL_CONFIG['task'] == 'generation':
+        checkpoint_monitor = "val_loss"
+        checkpoint_mode = "min"
+        checkpoint_filename = "best-{epoch:02d}-{val_loss:.4f}"
+    else:
+        checkpoint_monitor = "val_acc"
+        checkpoint_mode = "max"
+        checkpoint_filename = "best-{epoch:02d}-{val_acc:.4f}"
+        
     callbacks = [
         LearningRateMonitor(logging_interval='step'),
         ModelCheckpoint(
-            dirpath=f"./checkpoints/{wandb_logger.name}",
-            filename="best-{epoch:02d}-{val_acc:.4f}",
-            monitor="val_acc",
-            mode="max",
+            dirpath=f"./checkpoints/{WANDB_CONFIG['name']}",
+            filename=checkpoint_filename,
+            monitor=checkpoint_monitor,
+            mode=checkpoint_mode,
             save_top_k=1,
             save_last=False
         ),
@@ -103,15 +110,16 @@ def train(config):
     }
     
     # ------- Noise Injector -------
-    noise_injector_config = {
-        "injector": NoiseInjector(
-            model=model,
-            noise_config=NOISE_CONFIG["noise_config"],
-            noise_std=NOISE_CONFIG["noise_std"]
-        ),
-        "schedule": NOISE_CONFIG["noise_schedule"]
-    }
-    
+    if NOISE_CONFIG is not None:
+        noise_injector_config = {
+            "injector": NoiseInjector(
+                model=model,
+                noise_config=NOISE_CONFIG["noise_config"],
+                noise_std=NOISE_CONFIG["noise_std"]
+            ),
+            "schedule": NOISE_CONFIG["noise_schedule"]
+        }
+
     # ------- Lightning Module -------
     print("\n[5/6) Setting up Lightning Module...")
     loss_fn = torch.nn.CrossEntropyLoss()

@@ -22,7 +22,7 @@ class LightningMamba(L.LightningModule):
     def on_train_epoch_start(self):
         if self.noise_schedule["train"] and self.noise_injector is not None:
             self.noise_injector.attach()
-
+            
     def on_validation_epoch_start(self):
         if self.noise_injector is None:
             return 

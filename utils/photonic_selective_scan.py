@@ -4,65 +4,6 @@ import torch.nn.functional as F
 from torch import Tensor
 from einops import rearrange, repeat, einsum
 
-class PhotonicSelectiveScanFn(torch.autograd.Function):
-    
-    @staticmethod
-    def forward(ctx, u, delta, A, B, C, D=None, z=None, delta_bias=None, delta_activation=None, gate_activation=None, return_last_state=False):
-        if u.stride(-1) != 1:
-            u = u.contiguous()
-        if delta.stride(-1) != 1:
-            delta = delta.contiguous()
-        if D is not None:
-            D = D.contiguous()
-        if B.stride(-1) != 1:
-            B = B.contiguous()
-        if C.stride(-1) != 1:
-            C = C.contiguous()
-        if z is not None and z.stride(-1) != 1:
-            z = z.contiguous()
-        if B.dim() == 3:
-            B = rearrange(B, "b dstate l -> b 1 dstate l")
-            ctx.squeeze_B = True
-        if C.dim() == 3:
-            C = rearrange(C, "b dstate l -> b 1 dstate l")
-            ctx.squeeze_C = True
-            
-        out = selective_scan_photonic_fn(u, delta, A, B, C, D, z, delta_bias, delta_activation, gate_activation, return_last_state)
-        
-        ctx.save_for_backward(u, delta, A, B, C, D, z, delta_bias)
-        ctx.delta_activation = delta_activation
-        ctx.gate_activation = gate_activation
-        
-        if return_last_state:
-            out, last_state = out
-            ctx.last_state = last_state
-            return out, last_state
-        return out
-    
-    @staticmethod
-    def backward(ctx, dout, *args):
-        u, delta, A, B, C, D, z, delta_bias = ctx.saved_tensors
-        delta_activation = ctx.delta_activation
-        gate_activation = ctx.gate_activation
-        
-        if dout.stride(-1) != 1:
-            dout = dout.contiguous()
-            
-        dtype_in = u.type
-        u = u.float()
-        delta = delta.float()
-        dout = dout.float()
-        
-        batch, dim, seq_len = u.shape
-        dstate = A.shape[1]
-        
-        is_variable_B = B.dim() >= 3
-        is_variable_C = C.dim() >= 3
-        
-        if delta_bias is not None:
-            delta = delta + delta_bias
-    
-    
 def selective_scan_photonic_fn(
     u, 
     delta,
@@ -72,8 +13,8 @@ def selective_scan_photonic_fn(
     D=None,
     z=None,
     delta_bias=None, 
-    delta_activation=None,
-    gate_activation=None,
+    delta_activation=nn.Softplus(),
+    gate_activation=nn.SiLU(),
     return_last_state=False
     ):
     """
@@ -98,10 +39,12 @@ def selective_scan_photonic_fn(
     
     if delta_bias is not None:
         delta = delta + delta_bias[..., None].float()
-        
-    if delta_activation is not None:
-        delta = delta_activation(delta)
-        
+    
+    assert delta_activation is not None, "delta_activation must be provided"
+    assert gate_activation is not None, "gate_activation must be provided"
+    delta = delta_activation(delta)
+    delta = delta.clamp(min=1e-4, max=20.0)
+    
     batch, dim, dstate = u.shape[0], A.shape[0], A.shape[1]
     is_variable_B = B.dim() >= 3
     is_variable_C = C.dim() >= 3
@@ -118,6 +61,7 @@ def selective_scan_photonic_fn(
     x = A.new_zeros((batch, dim, dstate))
     ys = []
     deltaA = torch.exp(torch.einsum('bdl,dn->bdln', delta, A))
+    # delta_A = delta_A.clamp(min=-20.0, max=0.0)
     
     if not is_variable_B:
         deltaB_u = torch.einsum('bdl,dn,bdl->bdln', delta, B, u)
@@ -153,8 +97,7 @@ def selective_scan_photonic_fn(
     out = y if D is None else y + u * rearrange(D, "d -> d 1")
     
     if z is not None:
-        if gate_activation is not None:
-            out = out * gate_activation(z)
+        out = out * gate_activation(z)
             
     out = out.to(dtype=dtype_in)
     return out if not return_last_state else (out, last_state)

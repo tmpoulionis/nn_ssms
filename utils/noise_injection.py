@@ -30,12 +30,13 @@ class NoiseInjector(nn.Module):
                 )
             
             if self.noise_config["weight"] and hasattr(module, 'weight'):
-                self._original_weights = module.weight.data.clone()
+                self._original_weights[name] = module.weight.data.clone() # Store original weights and biases
                 module.weight.data = module.weight.data + torch.randn_like(module.weight.data) * self.noise_std
             
             if self.noise_config["bias"] and hasattr(module, 'bias') and hasattr(module.bias, 'data'):
+                self._original_biases[name] = module.bias.data.clone()
                 module.bias.data = module.bias.data + torch.randn_like(module.bias.data) * self.noise_std
-                self._original_biases = module.bias.data.clone()
+                
                 
             return x
         return pre_hook
@@ -44,9 +45,9 @@ class NoiseInjector(nn.Module):
         def post_hook(module, input, output):
             # Restore original weights and biases
             if self.noise_config["weight"] and hasattr(module, 'weight'):
-                module.weight.data = self._original_weights
+                module.weight.data = self._original_weights[name]
             if self.noise_config["bias"] and hasattr(module, 'bias') and hasattr(module.bias, 'data'):
-                module.bias.data = self._original_biases
+                module.bias.data = self._original_biases[name]
             
             # Inject noise into output
             if self.noise_config["output"]:

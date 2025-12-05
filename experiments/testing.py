@@ -44,7 +44,7 @@ config = {
     },
     "noise_injector": {
         "noise_schedule": {
-            "train": True,
+            "train": False,
             "eval": True
         },
         "noise_config": {
@@ -53,7 +53,7 @@ config = {
             "bias": True,
             "output": True
         },
-        "noise_std": 0.06
+        "noise_std": 0.1
     },
     "seed": 42,
     "wandb": {

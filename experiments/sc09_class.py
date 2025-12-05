@@ -8,12 +8,12 @@ config = {
         "expand": 2,
         'task': 'classification',
         "conv_activation": 'pelulike',
-        # "delta_activation": 'softplus',
-        # "gate_activation": 'silu',
+        "delta_activation": 'pelulike',
+        "gate_activation": 'pelulike',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
-        "mlp_act": "pelulike",
+        "mlp_act": 'pelulike',
         "out_activation": None,
         "dropout": 0.1,
         "use_layernorm": True,
@@ -41,6 +41,19 @@ config = {
         "weight_decay": 0.1,
         "betas": (0.9, 0.95),   
         "eps": 1e-8
+    },
+    "noise_injector": {
+        "noise_schedule": {
+            "train": False,
+            "eval": False
+        },
+        "noise_config": {
+            "input": True,
+            "weight": True,
+            "bias": True,
+            "output": True
+        },
+        "noise_std": 0.1
     },
     "seed": None,
     "wandb": {
