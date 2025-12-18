@@ -9,8 +9,9 @@ from utils.lightning import LightningMamba
 from utils.noise_injection import NoiseInjector
 from torch.optim.lr_scheduler import LambdaLR
 from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config, load_config
+import math
 import wandb
-import time
+import time    
 
 torch.set_float32_matmul_precision('medium') # or 'high'
 
@@ -183,10 +184,6 @@ def train(config):
     
     return trainer, lightning_module
     
-    
-import math
-from torch.optim.lr_scheduler import LambdaLR
-
 def create_scheduler(optimizer, total_steps, warmup_steps=0):
     def lr_lambda(current_step):
         # Linear Warmup
@@ -197,7 +194,7 @@ def create_scheduler(optimizer, total_steps, warmup_steps=0):
         progress = (current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
         cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
         
-        return cosine_decay
+        return max(cosine_decay, 0.1)
     
     return LambdaLR(optimizer, lr_lambda)
 
