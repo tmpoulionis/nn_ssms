@@ -64,6 +64,10 @@ class SCDataset(datasets.SPEECHCOMMANDS):
         label_index = self.label_to_index[label]
         norm_waveform = (waveform - waveform.mean()) / (waveform.std() + 1e-8) # Normalize
         
+        max = norm_waveform.max() # Min-max normalization to [0, 1] for non-negativity
+        min = norm_waveform.min()
+        waveform = (norm_waveform - min) / (max - min + 1e-8)
+        
         return norm_waveform, label_index
     
     def __len__(self):

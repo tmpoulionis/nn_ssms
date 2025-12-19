@@ -37,7 +37,6 @@ class NoiseInjector(nn.Module):
                 self._original_biases[name] = module.bias.data.clone()
                 module.bias.data = module.bias.data + torch.randn_like(module.bias.data) * self.noise_std
                 
-                
             return x
         return pre_hook
     

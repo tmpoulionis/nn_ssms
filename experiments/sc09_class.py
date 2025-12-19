@@ -7,9 +7,9 @@ config = {
         "d_conv": 4,
         "expand": 2,
         'task': 'classification',
-        "conv_activation": 'pelulike',
-        "delta_activation": 'softplus',
-        "gate_activation": 'silu',
+        "conv_activation": 'silu',
+        "delta_activation": 'pelulike',
+        "gate_activation": 'pelulike',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
@@ -58,7 +58,7 @@ config = {
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'phot1: "eval" std=0.02',
+        "name": 'config3: softplus&gate',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }
