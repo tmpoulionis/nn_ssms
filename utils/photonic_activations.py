@@ -47,7 +47,8 @@ class PELULike(nn.Module):
         self.x0 = x0
         
     def forward(self, x):
-        return torch.where(x>=self.x0, self.b*(x - self.x0) + self.c, self.a*(torch.exp(x - self.x0) - 1) + self.c)
+        out = torch.where(x>=self.x0, self.b*(x - self.x0) + self.c, self.a*(torch.exp(x - self.x0) - 1) + self.c)
+        return out*5.5
     
 class PInvELU(nn.Module):
     def __init__(self, a: float = 0.02395, b: float = 0.15568, c: float = 0.08616, d: float = 0.04855, x0: float = -0.2):
