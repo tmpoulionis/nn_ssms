@@ -110,3 +110,39 @@ def print_config(config: dict, list: list):
 def load_config(name: str):
     module = importlib.import_module(f"experiments.{name}")
     return module.config
+
+def check_negative_weights(model, verbose=True):
+    results={}
+    total_params = 0
+    total_negative = 0
+    
+    for name, param in model.named_parameters():
+        num_params = param.numel()
+        num_negative = (param.data < 0).sum().item()
+        total_params += num_params
+        total_negative += num_negative
+        min = param.data.min().item()
+        max = param.data.max().item()
+        
+        results[name] = {
+            'total_params': num_params,
+            'negative_params': num_negative,
+            'ratio': num_negative / num_params,
+            'min': min,
+            'max': max
+        }
+        
+        if verbose and num_negative > 0:
+            print(f"Parameter '{name}")
+            print(f"\t {num_negative}/{num_params} negative parameters.")
+            print(f"\t min: {min}, max: {max}")
+            
+    print("Overall Negative Weights Summary:")
+    print(f"\t {total_negative}/{total_params} negative parameters.")
+    print(f"\t Overall Ratio: {total_negative / total_params}")
+    print(f"Negative Weights found in:")
+    for name, stats in results.items():
+        if stats['negative_params'] > 0:
+            print(f" - {name}")
+        
+    return results
