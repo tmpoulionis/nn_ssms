@@ -60,7 +60,7 @@ def selective_scan_photonic_fn(
         
     x = A.new_zeros((batch, dim, dstate))
     ys = []
-    deltaA = torch.exp(torch.einsum('bdl,dn->bdln', delta, A))
+    deltaA = torch.exp(-torch.einsum('bdl,dn->bdln', delta, A))
     # delta_A = delta_A.clamp(min=-20.0, max=0.0)
     
     if not is_variable_B:
