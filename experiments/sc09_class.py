@@ -7,13 +7,13 @@ config = {
         "d_conv": 4,
         "expand": 2,
         'task': 'classification',
-        "conv_activation": 'pelulike',
-        "delta_activation": 'pelulike',
-        "gate_activation": 'pelulike',
+        "conv_activation": 'silu',
+        "delta_activation": 'softplus',
+        "gate_activation": 'silu',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
-        "mlp_act": 'pelulike',
+        "mlp_act": 'gelu',
         "out_activation": None,
         "dropout": 0.1,
         "use_layernorm": True,
@@ -52,13 +52,13 @@ config = {
             "weight": True,
             "bias": True,
             "output": True
-        },
+        },s
         "noise_std": 0.02
     },
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2 d32: full nn scale=5.778',
+        "name": 'config3: non-photonic new initialization',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

@@ -39,17 +39,29 @@ class PTanhLike(nn.Module):
         return self.a + (self.d + self.b*torch.sinh(x - self.x0)) / (self.e + self.c*torch.cosh(x - self.x0))
 
 class PELULike(nn.Module):
-    def __init__(self, a: float = 0.0368, b: float = 0.18175, c: float = -0.01957, x0: float = 0.37042):
+    def __init__(self, a: float = 0.0368, b: float = 0.18175, c: float = -0.01957, x0: float = 0.37042, scale: float = 5.778):
         super().__init__()
         self.a = a
         self.b = b
         self.c = c
         self.x0 = x0
+        self.scale = scale
         
     def forward(self, x):
         out = torch.where(x>=self.x0, self.b*(x - self.x0) + self.c, self.a*(torch.exp(x - self.x0) - 1) + self.c)
-        return 5.778*out # Scale to match Softplus/Silu
+        return out*self.scale
     
+    def inverse(self, y):
+        y_unscaled = y / self.scale
+
+        # Linear region
+        x_lin = (y_unscaled - self.c)/self.b + self.x0
+        
+        # Exponential region
+        x_exp = torch.log((y_unscaled - self.c)/self.a + 1) + self.x0
+        
+        return torch.where(y_unscaled >= self.c, x_lin, x_exp)
+
 class PInvELU(nn.Module):
     def __init__(self, a: float = 0.02395, b: float = 0.15568, c: float = 0.08616, d: float = 0.04855, x0: float = -0.2):
         super().__init__()
