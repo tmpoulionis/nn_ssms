@@ -37,6 +37,18 @@ def selective_scan_photonic_fn(
     u = u.float()
     delta = delta.float()
     
+    # Debugging checks for non-negativity
+    # check_negative_values("u", u)
+    # check_negative_values("delta", delta)
+    # check_negative_values("delta bias", delta_bias)
+    # check_negative_values("A", A)
+    # check_negative_values("B", B)
+    # check_negative_values("C", C)
+    # if D is not None:
+    #     check_negative_values("D", D)
+    # if z is not None:
+    #     check_negative_values("z", z)
+    
     if delta_bias is not None:
         delta = delta + delta_bias[..., None].float()
     
@@ -60,7 +72,7 @@ def selective_scan_photonic_fn(
         
     x = A.new_zeros((batch, dim, dstate))
     ys = []
-    deltaA = torch.exp(torch.einsum('bdl,dn->bdln', delta, A))
+    deltaA = torch.exp(-torch.einsum('bdl,dn->bdln', delta, A))
     # delta_A = delta_A.clamp(min=-20.0, max=0.0)
     
     if not is_variable_B:
@@ -101,3 +113,15 @@ def selective_scan_photonic_fn(
             
     out = out.to(dtype=dtype_in)
     return out if not return_last_state else (out, last_state)
+
+def check_negative_values(name, tensor):
+    num_neg = (tensor < 0).sum().item()
+    total = tensor.numel()
+    
+    if num_neg == 0:
+        print(f"✔️ Parameter {name} has no negative values. ({total})")
+    else:
+        print(f"❌ Parameter {name}:")
+        print(f"\t {num_neg}/{total} negative values.")
+        print(f"\t min: {tensor.min().item()}, max: {tensor.max().item()}")
+          

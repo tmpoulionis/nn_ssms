@@ -57,7 +57,7 @@ class PhotonicMamba(nn.Module):
         if mamba.in_proj.bias is not None:
             xz = xz + rearrange(mamba.in_proj.bias.to(dtype=xz.dtype), "d -> d 1")
 
-        A = -torch.exp(mamba.A_log.float())  # (d_inner, d_state)
+        A = torch.exp(mamba.A_log.float())  # (d_inner, d_state)
         x, z = xz.chunk(2, dim=1)
         
         # Compute short convolution

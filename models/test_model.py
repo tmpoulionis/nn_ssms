@@ -109,7 +109,7 @@ class MambaModel(nn.Module):
         
         for i, mamba_block in enumerate(self.mamba_layers):
             if self.use_prenorm:
-                # Pre-normalize then apply Mamba with residual connection
+                # Normalize then apply Mamba with residual connection
                 residual = x
                 x = self.layer_norms[i](x)
                 x = mamba_block(x) + residual # Residual connection

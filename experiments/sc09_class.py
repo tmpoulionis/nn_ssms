@@ -3,11 +3,11 @@ config = {
         "num_layers": 2,
         "d_model": 64,
         'vocab_size': None,
-        "d_state": 16,
+        "d_state": 32,
         "d_conv": 4,
         "expand": 2,
         'task': 'classification',
-        "conv_activation": 'silu',
+        "conv_activation": 'pelulike',
         "delta_activation": 'pelulike',
         "gate_activation": 'pelulike',
         "use_prenorm": True,
@@ -58,7 +58,7 @@ config = {
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'config3: softplus&gate',
+        "name": 'l2 d32: full nn scale=5.778',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

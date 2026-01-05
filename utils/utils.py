@@ -111,7 +111,7 @@ def load_config(name: str):
     module = importlib.import_module(f"experiments.{name}")
     return module.config
 
-def check_negative_weights(model, verbose=True):
+def check_non_negativity(model, verbose=True):
     results={}
     total_params = 0
     total_negative = 0
@@ -133,9 +133,11 @@ def check_negative_weights(model, verbose=True):
         }
         
         if verbose and num_negative > 0:
-            print(f"Parameter '{name}")
+            print(f"❌ Parameter '{name}")
             print(f"\t {num_negative}/{num_params} negative parameters.")
             print(f"\t min: {min}, max: {max}")
+        elif verbose and num_negative == 0:
+            print(f"✔️ Parameter '{name}' has no negative values. ({num_params})")
             
     print("Overall Negative Weights Summary:")
     print(f"\t {total_negative}/{total_params} negative parameters.")
