@@ -36,6 +36,8 @@ def train(config):
     OPTIMIZER_CONFIG = config["optimizer"]
     NOISE_CONFIG = config["noise_injector"] if "noise_injector" in config else None
     WANDB_CONFIG = config["wandb"]
+    if "non_negative" not in config:
+        config["non_negative"] = False
 
     # ------- Load Dataset and create DataLoaders -------
     print("\n[1/6] Preparing DataLoaders...")
@@ -131,7 +133,8 @@ def train(config):
         loss_fn=loss_fn,
         opt_hyperparams=OPTIMIZER_CONFIG,
         scheduler_config=scheduler_config,
-        noise_injector_config=noise_injector_config
+        noise_injector_config=noise_injector_config,
+        non_negative=config["non_negative"]
     )
     
     # ------- Trainer -------

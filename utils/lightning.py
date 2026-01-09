@@ -4,7 +4,7 @@ from torchmetrics.functional import accuracy
 from utils.noise_injection import NoiseInjector
 from utils.non_negativity import NonNegativityHooks
 class LightningMamba(L.LightningModule):
-    def __init__(self, model, optimizer, loss_fn, scheduler_config=None, opt_hyperparams=None, noise_injector_config=None):
+    def __init__(self, model, optimizer, loss_fn, scheduler_config=None, opt_hyperparams=None, noise_injector_config=None, non_negative=False):
         super().__init__()
         self.model = model
         self.loss_fn = loss_fn
@@ -16,17 +16,20 @@ class LightningMamba(L.LightningModule):
         self.noise_injector = noise_injector_config["injector"]
         self.noise_schedule = noise_injector_config["schedule"]
         
+        self.non_negative = non_negative
         self.non_negativity_hooks = NonNegativityHooks(model)
         
     def forward(self, x):
         return self.model(x)
     
     def on_train_start(self):
-        self.non_negativity_hooks.register()
+        if self.non_negative:
+            self.non_negativity_hooks.register()
         return
     
     def on_train_end(self):
-        self.non_negativity_hooks.detach()
+        if self.non_negative:
+            self.non_negativity_hooks.detach()
         return
     
     def on_train_epoch_start(self):

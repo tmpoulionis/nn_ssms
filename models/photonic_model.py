@@ -8,7 +8,6 @@ import torch.nn.functional as f
 import math
 import warnings
 from utils.activations import Activation
-from mamba_ssm.modules.mamba_simple import Mamba
 from einops import rearrange, repeat
 from utils.photonic_selective_scan import selective_scan_photonic_fn
 
@@ -60,9 +59,9 @@ class PhotonicMamba(nn.Module):
 
         if not conv_activation == 'silu':
             # Force use_fast_path to False
-            if mamba_kwargs["use_fast_path"] or "use_fast_path" not in mamba_kwargs:
+            if self.use_fast_path:
                 warnings.warn("Photonic Mamba does not support 'use_fast_path'. Setting 'use_fast_path' to False...")
-                mamba_kwargs["use_fast_path"] = False
+                self.use_fast_path = False
         
         self.act = Activation(conv_activation)
         self.delta_activation = Activation(delta_activation)

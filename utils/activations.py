@@ -15,6 +15,8 @@ def Activation(activation=None, size=None, dim=-1):
         return pa.PTanhLike()
     elif activation == 'pelulike':
         return pa.PELULike()
+    elif activation == 'nnpelulike':
+        return pa.NNPELULike()
     elif activation == 'pinvelu':
         return pa.PInvELU()
     elif activation == 'pdsinsq':
