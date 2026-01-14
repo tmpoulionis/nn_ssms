@@ -53,13 +53,19 @@ config = {
             "bias": True,
             "output": True
         },
+        
         "noise_std": 0.02
     },
-    "non_negative": True,
+    "non_negative": {
+        "enabled": True,
+        "penalty_type": "l2",
+        "penalty_weight": 1,
+        "margin": 0.01,
+        "exclude": None},
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2d32: full nn dt&A scaled',
+        "name": 'l2d32: full nn seed=42 (non-neg data)',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

@@ -34,10 +34,13 @@ def train(config):
     TRAINER_CONFIG = config["trainer"]
     DATASET_CONFIG = config["dataset"]
     OPTIMIZER_CONFIG = config["optimizer"]
-    NOISE_CONFIG = config["noise_injector"] if "noise_injector" in config else None
     WANDB_CONFIG = config["wandb"]
-    if "non_negative" not in config:
-        config["non_negative"] = False
+    
+    if ("noise_injector" not in config) or (not config["noise_injector"]["noise_schedule"]["train"] and not config["noise_injector"]["noise_schedule"]["eval"]):
+        config["noise_injector"] = None
+
+    if ("non_negative" not in config) or (not config["non_negative"]["enabled"]):
+        config["non_negative"] = None
 
     # ------- Load Dataset and create DataLoaders -------
     print("\n[1/6] Preparing DataLoaders...")
@@ -112,17 +115,6 @@ def train(config):
         }
     }
     
-    # ------- Noise Injector -------
-    if NOISE_CONFIG is not None:
-        noise_injector_config = {
-            "injector": NoiseInjector(
-                model=model,
-                noise_config=NOISE_CONFIG["noise_config"],
-                noise_std=NOISE_CONFIG["noise_std"]
-            ),
-            "schedule": NOISE_CONFIG["noise_schedule"]
-        }
-
     # ------- Lightning Module -------
     print("\n[5/6) Setting up Lightning Module...")
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -133,7 +125,7 @@ def train(config):
         loss_fn=loss_fn,
         opt_hyperparams=OPTIMIZER_CONFIG,
         scheduler_config=scheduler_config,
-        noise_injector_config=noise_injector_config,
+        noise_injection=config["noise_injector"],
         non_negative=config["non_negative"]
     )
     

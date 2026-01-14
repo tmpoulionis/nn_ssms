@@ -111,6 +111,27 @@ def load_config(name: str):
     module = importlib.import_module(f"experiments.{name}")
     return module.config
 
+def compute_negative_penalty(model, penalty_type='hinge', margin=0.01, exclude=None):
+    penalty = 0
+    for name, param in model.named_parameters():
+        
+        if exclude is not None and exclude in name:
+            continue
+        
+        if penalty_type == 'l1':
+            negative_val = torch.clamp(param, max=0)
+            penalty = penalty + torch.sum(negative_val)
+            
+        if penalty_type == 'l2':
+            negative_val = torch.clamp(param, max=0)
+            penalty = penalty + torch.sum(negative_val**2)
+            
+        if penalty_type == 'hinge':
+            negative_val = torch.clamp(param - margin, max=0)
+            penalty = penalty + torch.sum(negative_val**2)
+            
+    return penalty
+
 def check_non_negativity(model, verbose=True):
     results={}
     total_params = 0

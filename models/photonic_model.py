@@ -86,7 +86,12 @@ class PhotonicMamba(nn.Module):
             torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
             + math.log(dt_min)
         ).clamp(min=dt_init_floor)
-        inv_dt = self.delta_activation.inverse(dt) if self.delta_activation =='pelulike' else dt + torch.log(-torch.expm1(-dt))
+  
+        if hasattr(self.delta_activation, 'inverse'):
+            inv_dt = self.delta_activation.inverse(dt)
+        else:
+            inv_dt = dt + torch.log(-torch.expm1(-dt))
+            
         with torch.no_grad():
             self.dt_proj.bias.copy_(inv_dt)
         # Our initialization would set all Linear.bias to zero, need to mark this one as _no_reinit

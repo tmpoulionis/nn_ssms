@@ -76,17 +76,17 @@ def selective_scan_photonic_fn(
         C = repeat(C, "B G N L -> B (G H) N L", H=dim // C.shape[1])
         
     # Debugging checks for non-negativity
-    # check_negative_values("u", u)
-    # check_negative_values("delta", delta)
-    # check_negative_values("delta bias", delta_bias)
-    # check_negative_values("A", A)
-    # check_negative_values("B", B)
-    # check_negative_values("C", C)
-    # check_negative_values("deltaA", deltaA)
-    # if D is not None:
-    #     check_negative_values("D", D)
-    # if z is not None:
-    #     check_negative_values("z", z)
+    check_negative_values("u", u)
+    check_negative_values("delta", delta)
+    check_negative_values("delta bias", delta_bias)
+    check_negative_values("A", A)
+    check_negative_values("B", B)
+    check_negative_values("C", C)
+    check_negative_values("deltaA", deltaA)
+    if D is not None:
+        check_negative_values("D", D)
+    if z is not None:
+        check_negative_values("z", z)
         
     last_state = None
     for i in range(u.shape[2]):

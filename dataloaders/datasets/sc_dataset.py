@@ -68,7 +68,7 @@ class SCDataset(datasets.SPEECHCOMMANDS):
         min = norm_waveform.min()
         waveform = (norm_waveform - min) / (max - min + 1e-8)
         
-        return norm_waveform, label_index
+        return waveform, label_index
     
     def __len__(self):
         return len(self.data_indices)
