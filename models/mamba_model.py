@@ -29,7 +29,7 @@ class MambaModel(nn.Module):
         mlp_act: str='gelu',
         out_activation: str=None,
         dropout: float=0.1,
-        use_layernorm: bool=True,
+        use_mlp_prenorm: bool=True,
         return_last_state: bool=False,
         **kwargs
     ):
@@ -54,7 +54,7 @@ class MambaModel(nn.Module):
         
         for _ in range(self.num_layers):
             if self.use_prenorm:
-                self.layer_norms.append(nn.LayerNorm(d_model))
+                self.layer_norms.append(nn.RMSNorm(d_model))
             
             self.mamba_layers.append(
                 PhotonicMamba(
@@ -69,7 +69,7 @@ class MambaModel(nn.Module):
                 )
             )
             
-        self.final_norm = nn.LayerNorm(d_model) if use_final_norm else nn.Identity()
+        self.final_norm = nn.RMSNorm(d_model) if use_final_norm else nn.Identity()
         
         # Generation head
         if task == 'generation':
@@ -87,8 +87,8 @@ class MambaModel(nn.Module):
                 for i in range(len(mlp_dims) - 1):
                     mlp_layers.append(nn.Linear(mlp_dims[i], mlp_dims[i+1]))
                     if i < len(mlp_dims) - 2:
-                        if use_layernorm:
-                            mlp_layers.append(nn.LayerNorm(mlp_dims[i+1]))
+                        if use_mlp_prenorm:
+                            mlp_layers.append(nn.RMSNorm(mlp_dims[i+1]))
                         mlp_layers.append(Activation(mlp_act))
 
                         if dropout > 0:
@@ -104,6 +104,8 @@ class MambaModel(nn.Module):
         '''
         x: (B, L, D)
         '''
+        
+        # print(f"Input: min value: {x.min()} negative values: {(x<0).sum()}/{x.numel()}")
         if self.task == 'generation':
             x = self.embedding(x) # (B, L) --> (B, L, d_model)
         
@@ -112,12 +114,13 @@ class MambaModel(nn.Module):
                 # Normalize then apply Mamba with residual connection
                 residual = x
                 x = self.layer_norms[i](x)
+                # print(f"After pre-norm: min value: {x.min()} negative values: {(x<0).sum()}/{x.numel()}")
                 x = mamba_block(x) + residual # Residual connection
             else:
                 x = mamba_block(x) # (B, L, D)
                 
         x = self.final_norm(x)
-            
+        # print(f"After final_norm: min value: {x.min()} negative values: {(x<0).sum()}/{x.numel()}")
         # Generation forward pass
         if self.task == 'generation':
             logits = self.head(x) # (B, L, vocab_size)

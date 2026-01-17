@@ -4,7 +4,7 @@ import torch
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from models.test_model import MambaModel
+from models.mamba_model import MambaModel
 from utils.lightning import LightningMamba
 from utils.noise_injection import NoiseInjector
 from torch.optim.lr_scheduler import LambdaLR
