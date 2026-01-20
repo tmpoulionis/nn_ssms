@@ -3,17 +3,17 @@ config = {
         "num_layers": 3,
         "d_model": 64,
         'vocab_size': None,
-        "d_state": 32,
+        "d_state": 64,
         "d_conv": 4,
         "expand": 2,
         'task': 'classification',
-        "conv_activation": 'nn_pelulike',
-        "delta_activation": 'nn_pelulike',
-        "gate_activation": 'nn_pelulike',
+        "conv_activation": 'pelulike',
+        "delta_activation": 'pelulike',
+        "gate_activation": 'pelulike',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
-        "mlp_act": 'nn_pelulike',
+        "mlp_act": 'pelulike',
         "out_activation": None,
         "dropout": 0.1,
         "use_mlp_prenorm": True,
@@ -57,7 +57,7 @@ config = {
         "noise_std": 0.02
     },
     "non_negative": {
-        "enabled": True,
+        "enabled": False,
         "penalty_type": "l2",
         "penalty_weight": 1,
         "margin": 0.01,
@@ -65,7 +65,7 @@ config = {
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l3d32: full full-nn seed=42',
+        "name": 'l2d16: full not-nn seed=42 (RMSNorm)',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

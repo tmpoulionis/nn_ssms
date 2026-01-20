@@ -11,6 +11,8 @@ def Activation(activation=None, size=None, dim=-1):
         return pa.PSigmoid()
     elif activation == 'psinusoidal':
         return pa.PSinusoidal()
+    elif activation == "shiftrelu":
+        return pa.ShiftedReLU()
     elif activation == 'ptanhlike':
         return pa.PTanhLike()
     elif activation == 'pelulike':

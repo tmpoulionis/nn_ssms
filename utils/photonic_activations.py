@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import math
 
 class PSigmoid(nn.Module):
     def __init__(self, a1: float = 0.0198, a2: float = 0.07938, x0: float = 1.26092, d: float = 0.48815):
@@ -61,9 +62,9 @@ class PELULike(nn.Module):
         x_exp = torch.log((y_unscaled - self.c)/self.a + 1) + self.x0
         
         return torch.where(y_unscaled >= self.c, x_lin, x_exp)
-
+    
 class NN_PELULike(nn.Module):
-    def __init__(self, a: float = 0.0368, b: float = 0.18175, c: float = -0.01957, x0: float = 0.37042, scale: float = 5.778):
+    def __init__(self, a=0.0368, b=0.18175, c=-0.01957, x0=0.37042, scale=5.778):
         super().__init__()
         self.a = a
         self.b = b
@@ -71,11 +72,17 @@ class NN_PELULike(nn.Module):
         self.x0 = x0
         self.scale = scale
         
+        output_at_zero = a * (math.exp(-x0) - 1) + c
+        self.shift = -output_at_zero * scale
+        
     def forward(self, x):
-        out = torch.where(x>=self.x0, self.b*(x - self.x0) + self.c, self.a*(torch.exp(x - self.x0) - 1) + self.c)
-        out = torch.clamp(out * self.scale, min=0)
-        return out
-    
+        out = torch.where(
+            x >= self.x0, 
+            self.b * (x - self.x0) + self.c, 
+            self.a * (torch.exp(x - self.x0) - 1) + self.c
+        )
+        return out * self.scale + self.shift
+
     def inverse(self, y):
         y_unscaled = y / self.scale
 
@@ -84,9 +91,8 @@ class NN_PELULike(nn.Module):
         
         # Exponential region
         x_exp = torch.log((y_unscaled - self.c)/self.a + 1) + self.x0
-        
+         
         return torch.where(y_unscaled >= self.c, x_lin, x_exp)
-
     
 class PInvELU(nn.Module):
     def __init__(self, a: float = 0.02395, b: float = 0.15568, c: float = 0.08616, d: float = 0.04855, x0: float = -0.2):
