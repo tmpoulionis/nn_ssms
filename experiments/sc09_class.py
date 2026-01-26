@@ -1,19 +1,19 @@
 config = {
     "model": {
-        "num_layers": 3,
+        "num_layers": 2,
         "d_model": 64,
         'vocab_size': None,
-        "d_state": 64,
+        "d_state": 16,
         "d_conv": 4,
         "expand": 2,
         'task': 'classification',
-        "conv_activation": 'pelulike',
-        "delta_activation": 'pelulike',
-        "gate_activation": 'pelulike',
+        "conv_activation": 'nn_pelulike',
+        "delta_activation": 'nn_pelulike',
+        "gate_activation": 'nn_pelulike',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
-        "mlp_act": 'pelulike',
+        "mlp_act": 'nn_pelulike',
         "out_activation": None,
         "dropout": 0.1,
         "use_mlp_prenorm": True,
@@ -42,6 +42,9 @@ config = {
         "betas": (0.9, 0.95),   
         "eps": 1e-8
     },
+    "lr_scheduler": {
+        "warmup_steps": 0.1        
+        },
     "noise_injector": {
         "noise_schedule": {
             "train": False,
@@ -57,15 +60,19 @@ config = {
         "noise_std": 0.02
     },
     "non_negative": {
-        "enabled": False,
-        "penalty_type": "l2",
-        "penalty_weight": 1,
-        "margin": 0.01,
-        "exclude": None},
+        "enabled": True,
+        "scheduler": {
+          "l2_weight_start": 1,
+          "l2_weight_end":0.1,
+          "delay": 0.2,
+          "warmup": 0.1
+        },
+        "penalty_type": "elastic",
+        "penalty_weight": 1e-3},
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2d16: full not-nn seed=42 (RMSNorm)',
+        "name": 'l2d16: full nn w=1e-3 l2=[1, 0.1] delay=0.2 warmup=0.1 seed=42',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

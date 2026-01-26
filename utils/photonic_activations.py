@@ -84,7 +84,7 @@ class NN_PELULike(nn.Module):
         return out * self.scale + self.shift
 
     def inverse(self, y):
-        y_unscaled = y / self.scale
+        y_unscaled = (y - self.shift) / self.scale
 
         # Linear region
         x_lin = (y_unscaled - self.c)/self.b + self.x0

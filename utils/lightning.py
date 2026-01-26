@@ -1,18 +1,23 @@
 import os
 import torch
+import copy
 import lightning as L
 from torchmetrics.functional import accuracy
+from utils.utils import create_scheduler
 from utils.noise_injection import NoiseInjector
-from utils.utils import compute_negative_penalty
+from utils.non_negativity import compute_negative_penalty, NonNegativityScheduler
 
 class LightningMamba(L.LightningModule):
-    def __init__(self, model, optimizer, loss_fn, scheduler_config=None, opt_hyperparams=None, noise_injection=None, non_negative=None):
+    def __init__(self, model, total_steps, optimizer, loss_fn, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None):
         super().__init__()
+        self.saved_weights = {}
         self.model = model
+        self.total_steps = total_steps
         self.loss_fn = loss_fn
+        self.lr_scheduler = lr_scheduler
         self.optimizer = optimizer
         self.opt_hyperparams = opt_hyperparams if opt_hyperparams is not None else {}
-        self.scheduler_config = scheduler_config
+        self.lr_scheduler = lr_scheduler
         self.save_hyperparameters(ignore=['model', 'loss_fn'])
         
         # Non-Negativity
@@ -20,8 +25,10 @@ class LightningMamba(L.LightningModule):
             self.nn_enabled = non_negative["enabled"]
             self.nn_penalty = non_negative["penalty_type"]
             self.nn_weight = non_negative["penalty_weight"]
-            self.nn_margin = non_negative["margin"]
-            self.nn_exclude = non_negative["exclude"]
+            if non_negative["scheduler"] is not None:
+                self.nn_scheduler = NonNegativityScheduler(total_steps, **non_negative["scheduler"])
+            else:
+                self.nn_scheduler = None
         else:
             self.nn_enabled = False
         
@@ -69,21 +76,28 @@ class LightningMamba(L.LightningModule):
             
             # Save unclipped version
             unclipped_path = os.path.join(path, "unclipped.ckpt")
-            torch.save(checkpoint, unclipped_path)
+            unclipped = copy.deepcopy(checkpoint)
+            torch.save(unclipped, unclipped_path)
             
             # Clip negative weights
             for name, param in checkpoint["state_dict"].items():
-                if self.nn_exclude is not None and name in self.nn_exclude:
-                    continue
                 param.clamp_(min=0) # Lightning will save the clipped version automatically
             
     def training_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
         
         if self.nn_enabled and self.nn_penalty is not None:
-            neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, margin=self.nn_margin, exclude=self.nn_exclude)
-            loss = loss + self.nn_weight * neg_penalty
             
+            if self.nn_scheduler is not None and self.nn_penalty == 'elastic': # If there is a scheduler and using elastic net, use it to get L2 & L1 weights
+                l2_weight, l1_weight = self.nn_scheduler.get_weights(self.global_step)
+                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=l2_weight, l1_weight=l1_weight)
+            else:
+                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty)
+            
+            if self.global_step%243 == 0:
+                self.saved_weights[self.global_step] =  [l2_weight*self.nn_weight, l1_weight*self.nn_weight]
+                
+            loss = loss + self.nn_weight * neg_penalty
             metrics = {'nn_penalty': neg_penalty, 'train_loss': loss, 'train_acc': acc}
             self.log_dict(metrics, prog_bar=True, on_epoch=True, sync_dist=True)
         else:
@@ -145,14 +159,10 @@ class LightningMamba(L.LightningModule):
     def configure_optimizers(self):
         optimizer = self.optimizer(self.model.parameters(), **self.opt_hyperparams)
         
-        if self.scheduler_config is None:
+        if self.lr_scheduler is None:
             return optimizer
         else:
-            scheduler = self.scheduler_config["scheduler"](
-                optimizer,
-                **self.scheduler_config["params"]
-            )
-            
+            scheduler = create_scheduler(optimizer, self.total_steps, **self.lr_scheduler)
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
@@ -161,3 +171,7 @@ class LightningMamba(L.LightningModule):
                     "frequency": 1
                 }
             }
+
+    def on_train_end(self):
+        for step, weights in self.saved_weights.items():
+            print(f"Step: {step}, weights: {weights}")

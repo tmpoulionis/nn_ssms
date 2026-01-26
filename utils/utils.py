@@ -4,6 +4,8 @@ import random
 import torchinfo
 import numpy as np
 import lightning as L
+from torch.optim.lr_scheduler import LambdaLR
+import math
 from pathlib import Path
 import json
 import wandb
@@ -111,61 +113,16 @@ def load_config(name: str):
     module = importlib.import_module(f"experiments.{name}")
     return module.config
 
-def compute_negative_penalty(model, penalty_type='hinge', margin=0.01, exclude=None):
-    penalty = 0
-    for name, param in model.named_parameters():
+def create_scheduler(optimizer, total_steps, warmup_steps=0):
+    def lr_lambda(current_step):
+        # Linear Warmup
+        if current_step < warmup_steps:
+            return float(current_step) / float(max(1, warmup_steps))
         
-        if exclude is not None and exclude in name:
-            continue
+        # Cosine Decay
+        progress = (current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
         
-        if penalty_type == 'l1':
-            negative_val = torch.clamp(param, max=0)
-            penalty = penalty + torch.sum(negative_val)
-            
-        if penalty_type == 'l2':
-            negative_val = torch.clamp(param, max=0)
-            penalty = penalty + torch.sum(negative_val**2)
-            
-        if penalty_type == 'hinge':
-            negative_val = torch.clamp(param - margin, max=0)
-            penalty = penalty + torch.sum(negative_val**2)
-            
-    return penalty
-
-def check_non_negativity(model, verbose=True):
-    results={}
-    total_params = 0
-    total_negative = 0
+        return max(cosine_decay, 0.1)
     
-    for name, param in model.named_parameters():
-        num_params = param.numel()
-        num_negative = (param.data < 0).sum().item()
-        total_params += num_params
-        total_negative += num_negative
-        min = param.data.min().item()
-        max = param.data.max().item()
-        
-        results[name] = {
-            'total_params': num_params,
-            'negative_params': num_negative,
-            'ratio': num_negative / num_params,
-            'min': min,
-            'max': max
-        }
-        
-        if verbose and num_negative > 0:
-            print(f"❌ Parameter '{name}")
-            print(f"\t {num_negative}/{num_params} negative parameters.")
-            print(f"\t min: {min}, max: {max}")
-        elif verbose and num_negative == 0:
-            print(f"✔️ Parameter '{name}' has no negative values. ({num_params})")
-            
-    print("Overall Negative Weights Summary:")
-    print(f"\t {total_negative}/{total_params} negative parameters.")
-    print(f"\t Overall Ratio: {total_negative / total_params}")
-    print(f"Negative Weights found in:")
-    for name, stats in results.items():
-        if stats['negative_params'] > 0:
-            print(f" - {name}")
-        
-    return results
+    return LambdaLR(optimizer, lr_lambda)
