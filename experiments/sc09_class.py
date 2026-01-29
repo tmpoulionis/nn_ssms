@@ -43,7 +43,7 @@ config = {
         "eps": 1e-8
     },
     "lr_scheduler": {
-        "warmup_steps": 0.1        
+        "warmup": 0.1
         },
     "noise_injector": {
         "noise_schedule": {
@@ -61,18 +61,18 @@ config = {
     },
     "non_negative": {
         "enabled": True,
-        "scheduler": {
-          "l2_weight_start": 1,
-          "l2_weight_end":0.1,
-          "delay": 0.2,
-          "warmup": 0.1
-        },
-        "penalty_type": "elastic",
-        "penalty_weight": 1e-3},
+        "scheduler": None
+        #   {"l2_weight_start": 1,
+        #   "l2_weight_end":0.1,
+        #   "delay": 0,
+        #   "warmup": 0.4}
+          ,
+        "penalty_type": "l2",
+        "penalty_weight": 1e-6},
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2d16: full nn w=1e-3 l2=[1, 0.1] delay=0.2 warmup=0.1 seed=42',
+        "name": 'l2d16: full nn "l2" w=1e-6 seed=42',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

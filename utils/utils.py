@@ -113,7 +113,8 @@ def load_config(name: str):
     module = importlib.import_module(f"experiments.{name}")
     return module.config
 
-def create_scheduler(optimizer, total_steps, warmup_steps=0):
+def create_scheduler(optimizer, total_steps, warmup=0):
+    warmup_steps = int(total_steps*warmup)
     def lr_lambda(current_step):
         # Linear Warmup
         if current_step < warmup_steps:

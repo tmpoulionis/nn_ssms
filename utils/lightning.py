@@ -26,7 +26,7 @@ class LightningMamba(L.LightningModule):
             self.nn_penalty = non_negative["penalty_type"]
             self.nn_weight = non_negative["penalty_weight"]
             if non_negative["scheduler"] is not None:
-                self.nn_scheduler = NonNegativityScheduler(total_steps, **non_negative["scheduler"])
+                self.nn_scheduler = NonNegativityScheduler(total_steps, self.nn_penalty, **non_negative["scheduler"])
             else:
                 self.nn_scheduler = None
         else:
@@ -81,21 +81,18 @@ class LightningMamba(L.LightningModule):
             
             # Clip negative weights
             for name, param in checkpoint["state_dict"].items():
-                param.clamp_(min=0) # Lightning will save the clipped version automatically
+                checkpoint["state_dict"][name] = torch.clamp(param, min=0.0) # Lightning will save the clipped version automatically
             
     def training_step(self, batch, batch_idx):
         loss, acc = self._shared_eval_step(batch, batch_idx)
         
         if self.nn_enabled and self.nn_penalty is not None:
             
-            if self.nn_scheduler is not None and self.nn_penalty == 'elastic': # If there is a scheduler and using elastic net, use it to get L2 & L1 weights
+            if self.nn_scheduler is not None: # If there is a scheduler, use it to get L2 & L1 weights
                 l2_weight, l1_weight = self.nn_scheduler.get_weights(self.global_step)
                 neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=l2_weight, l1_weight=l1_weight)
             else:
-                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty)
-            
-            if self.global_step%243 == 0:
-                self.saved_weights[self.global_step] =  [l2_weight*self.nn_weight, l1_weight*self.nn_weight]
+                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=self.nn_weight, l1_weight=self.nn_weight)
                 
             loss = loss + self.nn_weight * neg_penalty
             metrics = {'nn_penalty': neg_penalty, 'train_loss': loss, 'train_acc': acc}
@@ -171,7 +168,3 @@ class LightningMamba(L.LightningModule):
                     "frequency": 1
                 }
             }
-
-    def on_train_end(self):
-        for step, weights in self.saved_weights.items():
-            print(f"Step: {step}, weights: {weights}")
