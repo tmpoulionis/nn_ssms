@@ -7,13 +7,13 @@ config = {
         "d_conv": 4,
         "expand": 2,
         'task': 'classification',
-        "conv_activation": 'nn_pelulike',
-        "delta_activation": 'nn_pelulike',
-        "gate_activation": 'nn_pelulike',
+        "conv_activation": 'nn_pelulike_v2',
+        "delta_activation": 'nn_pelulike_v2',
+        "gate_activation": 'nn_pelulike_v2',
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
-        "mlp_act": 'nn_pelulike',
+        "mlp_act": 'nn_pelulike_v2',
         "out_activation": None,
         "dropout": 0.1,
         "use_mlp_prenorm": True,
@@ -50,29 +50,30 @@ config = {
             "train": False,
             "eval": False
         },
-        "noise_config": {
-            "input": True,
-            "weight": True,
-            "bias": True,
-            "output": True
-        },
-        
+        "noise_config": 
+                {"input": True,
+                "weight": True,
+                "bias": True,
+                "output": True}
+        ,
         "noise_std": 0.02
     },
     "non_negative": {
         "enabled": True,
-        "scheduler": None
-        #   {"l2_weight_start": 1,
-        #   "l2_weight_end":0.1,
-        #   "delay": 0,
-        #   "warmup": 0.4}
-          ,
-        "penalty_type": "l2",
-        "penalty_weight": 1e-6},
+        "penalty_type": "elastic",
+        "penalty_weight": 5e-1,
+        "live_clipping": True,
+        "clip_interval": 1,
+        "scheduler":
+                {"l2_weight_start": 1,
+                "l2_weight_end": 0,
+                "delay": 0,
+                "warmup": 0.4}
+    }, 
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2d16: full nn "l2" w=1e-6 seed=42',
+        "name": 'l2d32: full nn "elastic" w=5e-1 l2[1,0] dw[0,0.4] clip(1) (nn_pelulike_v2) seed=42',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

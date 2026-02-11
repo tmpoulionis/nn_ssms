@@ -25,6 +25,8 @@ class LightningMamba(L.LightningModule):
             self.nn_enabled = non_negative["enabled"]
             self.nn_penalty = non_negative["penalty_type"]
             self.nn_weight = non_negative["penalty_weight"]
+            self.live_clip = non_negative["live_clipping"]
+            self.clip_interval = non_negative["clip_interval"]
             if non_negative["scheduler"] is not None:
                 self.nn_scheduler = NonNegativityScheduler(total_steps, self.nn_penalty, **non_negative["scheduler"])
             else:
@@ -50,6 +52,11 @@ class LightningMamba(L.LightningModule):
         if self.noise_injector is not None:
             if self.noise_schedule["train"]:
                 self.noise_injector.attach()
+                
+        if self.nn_enabled and self.live_clip:
+            if self.current_epoch % self.clip_interval == 0:
+                for name, param in self.model.named_parameters():
+                    param.data.clamp_(min=0.0)
             
     def on_validation_epoch_start(self):
         if self.noise_injector is not None:

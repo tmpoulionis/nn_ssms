@@ -19,6 +19,8 @@ def Activation(activation=None, size=None, dim=-1):
         return pa.PELULike()
     elif activation == 'nn_pelulike':
         return pa.NN_PELULike()
+    elif activation == 'nn_pelulike_v2':
+        return pa.NN_PELULike_v2()
     elif activation == 'pinvelu':
         return pa.PInvELU()
     elif activation == 'pdsinsq':

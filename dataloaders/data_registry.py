@@ -1,6 +1,7 @@
 from torch.nn.utils.rnn import pad_sequence
 from dataloaders.datasets.sc_dataset import SCDataset, sc_custom_collate
 from dataloaders.datasets.hg38_dataset import HG38Dataset
+from dataloaders.datasets.induction_heads_dataset import InductionHeadsDataset
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Type
 from torch.utils.data import Dataset
@@ -51,6 +52,14 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
             "max_length": 2**17,
             "tokenizer_name": "char",
             "add_eos": True
+        }
+    ),
+    "induction_heads": DatasetConfig(
+        dataset_class=InductionHeadsDataset,
+        default_params={
+            "subset": ['train', 'valid', 'test'],
+            "seq_len": 256,
+            "vocab_size": 16,
         }
     )
 }

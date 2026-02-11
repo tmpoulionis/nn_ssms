@@ -40,13 +40,17 @@ class PTanhLike(nn.Module):
         return self.a + (self.d + self.b*torch.sinh(x - self.x0)) / (self.e + self.c*torch.cosh(x - self.x0))
 
 class PELULike(nn.Module):
-    def __init__(self, a: float = 0.0368, b: float = 0.18175, c: float = -0.01957, x0: float = 0.37042, scale: float = 5.778):
+    def __init__(self, a: float = 0.0368, b: float = 0.18175, c: float = -0.01957, x0: float = 0.37042):
         super().__init__()
         self.a = a
         self.b = b
         self.c = c
         self.x0 = x0
-        self.scale = scale
+
+        # Compute scale to match SiLU at x=10
+        silu_at_10 = 10.0 / (1.0 + math.exp(-10.0))
+        base_at_10 = b * (10 - x0) + c
+        self.scale = silu_at_10 / base_at_10
         
     def forward(self, x):
         out = torch.where(x>=self.x0, self.b*(x - self.x0) + self.c, self.a*(torch.exp(x - self.x0) - 1) + self.c)
@@ -88,12 +92,51 @@ class NN_PELULike(nn.Module):
 
         # Linear region
         x_lin = (y_unscaled - self.c)/self.b + self.x0
-        
+
         # Exponential region
         x_exp = torch.log((y_unscaled - self.c)/self.a + 1) + self.x0
-         
+
         return torch.where(y_unscaled >= self.c, x_lin, x_exp)
-    
+
+class NN_PELULike_v2(nn.Module):
+    """PELULike shifted to approach 0 as x→-∞ and scaled to match softplus at x=10."""
+    def __init__(self, a=0.0368, b=0.18175, c=-0.01957, x0=0.37042):
+        super().__init__()
+        self.a = a
+        self.b = b
+        self.c = c
+        self.x0 = x0
+
+        # Base function floor as x → -∞: a*(0-1) + c = -a + c
+        base_floor = -a + c
+
+        # Target: match softplus at x=10
+        target_at_10 = math.log(1 + math.exp(10))  # softplus(10) ≈ 10.0
+
+        # Base function value at x=10 (linear region)
+        base_at_10 = b * (10 - x0) + c
+
+        # Solve:
+        #   base_floor * scale + shift = 0          (approach 0 as x → -∞)
+        #   base_at_10 * scale + shift = target_at_10  (match softplus at x=10)
+        self.scale = target_at_10 / (base_at_10 - base_floor)
+        self.shift = -base_floor * self.scale
+
+    def forward(self, x):
+        out = torch.where(
+            x >= self.x0,
+            self.b * (x - self.x0) + self.c,
+            self.a * (torch.exp(x - self.x0) - 1) + self.c
+        )
+        return out * self.scale + self.shift
+
+    def inverse(self, y):
+        y_unscaled = (y - self.shift) / self.scale
+        x_lin = (y_unscaled - self.c) / self.b + self.x0
+        log_arg = (y_unscaled - self.c) / self.a + 1
+        x_exp = torch.log(torch.clamp(log_arg, min=1e-6)) + self.x0
+        return torch.where(y_unscaled >= self.c, x_lin, x_exp)
+
 class PInvELU(nn.Module):
     def __init__(self, a: float = 0.02395, b: float = 0.15568, c: float = 0.08616, d: float = 0.04855, x0: float = -0.2):
         super().__init__()

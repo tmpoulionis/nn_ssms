@@ -8,3 +8,5 @@ dataloaders/__pycache__
 dataloaders/datasets/__pycache__
 models/__pycache__
 utils/ __pycache__
+CLAUDE.md
+agentic_workflow/
