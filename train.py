@@ -16,7 +16,7 @@ import time
 torch.set_float32_matmul_precision('medium') # or 'high'
 
     
-def train(config):
+def train(config, checkpoint_path=None):
     """
     Main training function with full W&B integration.
     
@@ -153,7 +153,12 @@ def train(config):
     print("="*70 + "\n")
     
     try:
-        trainer.fit(lightning_module, train_loader, val_loader)
+        if checkpoint_path is None:
+            trainer.fit(lightning_module, train_loader, val_loader)
+            ckpt = "best"
+        else:
+            print(f"Loading checkpoint from {checkpoint_path} and running test evaluation...")
+            ckpt = checkpoint_path
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user!")
         
@@ -161,7 +166,7 @@ def train(config):
     print("RUNNING TEST EVALUATION")
     print("="*70 + "\n")
     
-    trainer.test(lightning_module, test_loader, ckpt_path="best")
+    trainer.test(lightning_module, test_loader, ckpt_path=ckpt)
     
     elapsed = time.time() - start_time
     print(f"Total training time: {format_time(elapsed)}")
@@ -173,7 +178,8 @@ def train(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment', '-e', required=True, help="Which experiment config file from ./experiments to run.")
+    parser.add_argument('--checkpoint', '-c', default=None, help="Path to checkpoint. Skips training and runs test only.")
     args = parser.parse_args()
     
     config = load_config(args.experiment)
-    trainer, model = train(config)
+    trainer, model = train(config, checkpoint_path=args.checkpoint)

@@ -61,7 +61,7 @@ config = {
     "non_negative": {
         "enabled": True,
         "penalty_type": "elastic",
-        "penalty_weight": 5e-1,
+        "penalty_weight": 1e-3,
         "live_clipping": True,
         "clip_interval": 1,
         "scheduler":
@@ -73,7 +73,7 @@ config = {
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2d32: full nn "elastic" w=5e-1 l2[1,0] dw[0,0.4] clip(1) (nn_pelulike_v2) seed=42',
+        "name": 'l2d16: full nn clip(1) "elastic" w=1e-3 l2[1,0] dw[0,0.4] (nn_pelulike_v2) seed=42',
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }

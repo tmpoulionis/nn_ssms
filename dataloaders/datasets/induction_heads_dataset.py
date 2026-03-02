@@ -54,3 +54,4 @@ class InductionHeadsDataset(Dataset):
         data = seq[:-1].clone()
         target = seq[1:].clone()
         return data, target
+    

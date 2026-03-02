@@ -97,8 +97,10 @@ def check_non_negativity(model, verbose=True):
     print(f"\t {total_negative}/{total_params} negative parameters.")
     print(f"\t Overall Ratio: {total_negative / total_params}")
     print(f"Negative Weights found in:")
-    for name, stats in results.items():
-        if stats['negative_params'] > 0:
-            print(f" - {name}")
+    
+    if verbose:
+        for name, stats in results.items():
+            if stats['negative_params'] > 0:
+                print(f" - {name}")
         
     return results

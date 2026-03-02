@@ -80,10 +80,11 @@ class NN_PELULike(nn.Module):
         self.shift = -output_at_zero * scale
         
     def forward(self, x):
+        clamped_input = torch.clamp(x - self.x0, -50, 50) # Prevent overflow in exp
         out = torch.where(
-            x >= self.x0, 
-            self.b * (x - self.x0) + self.c, 
-            self.a * (torch.exp(x - self.x0) - 1) + self.c
+            x >= self.x0,
+            self.b * (x - self.x0) + self.c,
+            self.a * (torch.exp(clamped_input) - 1) + self.c
         )
         return out * self.scale + self.shift
 
@@ -123,10 +124,11 @@ class NN_PELULike_v2(nn.Module):
         self.shift = -base_floor * self.scale
 
     def forward(self, x):
+        clamped_input = torch.clamp(x - self.x0, -50, 50) # Prevent overflow in exp
         out = torch.where(
             x >= self.x0,
             self.b * (x - self.x0) + self.c,
-            self.a * (torch.exp(x - self.x0) - 1) + self.c
+            self.a * (torch.exp(clamped_input) - 1) + self.c
         )
         return out * self.scale + self.shift
 
