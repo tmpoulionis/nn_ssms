@@ -1,3 +1,5 @@
+from utils.utils import build_run_name
+
 config = {
     "model": {
         "num_layers": 2,
@@ -10,6 +12,8 @@ config = {
         "conv_activation": 'nn_pelulike_v2',
         "delta_activation": 'nn_pelulike_v2',
         "gate_activation": 'nn_pelulike_v2',
+        "dt_min": 0.001,
+        "dt_max": 0.1,
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [64, 128, 10],
@@ -39,7 +43,7 @@ config = {
     "optimizer": { # Using AdamW
         "lr": 1e-3,
         "weight_decay": 0.1,
-        "betas": (0.9, 0.95),   
+        "betas": (0.9, 0.95),
         "eps": 1e-8
     },
     "lr_scheduler": {
@@ -50,7 +54,7 @@ config = {
             "train": False,
             "eval": False
         },
-        "noise_config": 
+        "noise_config":
                 {"input": True,
                 "weight": True,
                 "bias": True,
@@ -61,20 +65,24 @@ config = {
     "non_negative": {
         "enabled": True,
         "penalty_type": "elastic",
-        "penalty_weight": 1e-3,
-        "live_clipping": True,
-        "clip_interval": 1,
+        "penalty_weight": 1e-1,
+        "live_clipping": False,
+        "exclude_bias": True,
+        "clip_mode": "step", # "step" or "epoch"
+        "clip_interval": 25,
         "scheduler":
                 {"l2_weight_start": 1,
                 "l2_weight_end": 0,
                 "delay": 0,
-                "warmup": 0.4}
-    }, 
+                "warmup": 0}
+    },
     "seed": 42,
     "wandb": {
         "project": None,
-        "name": 'l2d16: full nn clip(1) "elastic" w=1e-3 l2[1,0] dw[0,0.4] (nn_pelulike_v2) seed=42',
+        "notes": None,  # optional freeform suffix appended to auto-generated name
         "username": 'tmpoulionis-',
         "mode": 1 #(1: online or 2: offline)
     }
 }
+
+config["wandb"]["name"] = build_run_name(config)

@@ -81,6 +81,7 @@ class PhotonicMamba(nn.Module):
         else:
             raise NotImplementedError
 
+        # OLD dt_proj.bias initialization:
         # Initialize dt bias so that pelulike(delta) is between dt_min and dt_max
         dt = torch.exp(
             torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
@@ -96,7 +97,11 @@ class PhotonicMamba(nn.Module):
             self.dt_proj.bias.copy_(inv_dt)
         # Our initialization would set all Linear.bias to zero, need to mark this one as _no_reinit
         self.dt_proj.bias._no_reinit = True
-
+        
+        # NEW dt_proj.bias initialization 
+        
+        
+        
         # S4D real initialization
         A = repeat(
             torch.arange(1, self.d_state + 1, dtype=torch.float32, device=device),

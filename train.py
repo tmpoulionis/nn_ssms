@@ -99,7 +99,7 @@ def train(config, checkpoint_path=None):
         ),
         EarlyStopping(
             monitor="val_loss",
-            patience=20,
+            patience=100,
             mode="min",
             verbose=True
         )

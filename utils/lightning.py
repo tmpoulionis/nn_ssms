@@ -26,7 +26,10 @@ class LightningMamba(L.LightningModule):
             self.nn_penalty = non_negative["penalty_type"]
             self.nn_weight = non_negative["penalty_weight"]
             self.live_clip = non_negative["live_clipping"]
+            self.clip_mode = non_negative["clip_mode"]
             self.clip_interval = non_negative["clip_interval"]
+            self.exclude_bias = non_negative["exclude_bias"]
+            self._pre_val_params = None
             if non_negative["scheduler"] is not None:
                 self.nn_scheduler = NonNegativityScheduler(total_steps, self.nn_penalty, **non_negative["scheduler"])
             else:
@@ -52,18 +55,11 @@ class LightningMamba(L.LightningModule):
         if self.noise_injector is not None:
             if self.noise_schedule["train"]:
                 self.noise_injector.attach()
-            
-    def on_train_epoch_end(self):
-        if self.nn_enabled and self.live_clip:
-            if self.current_epoch % self.clip_interval == 0:
-                # Store unclipped state
-                self._last_unclipped_state = copy.deepcopy(self.model.state_dict())
-                
-                # Clip in-place
-                for param in self.model.parameters():
-                    param.data.clamp_(min=0.0)
-            print("train non-negativity:")
-            check_non_negativity(self.model, verbose=False)
+
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        # Non-negativity
+        if self.nn_enabled and self.live_clip and self.clip_mode == "step" and (self.global_step % self.clip_interval == 0):
+            self.clip_weights(exclude_biases=self.exclude_bias)
 
     def on_validation_epoch_start(self):
         if self.noise_injector is not None:
@@ -72,12 +68,18 @@ class LightningMamba(L.LightningModule):
             else:
                 self.noise_injector.dettach()
                 
-        # Clip model
+        # Non-negativity
         if self.nn_enabled:
-            for param in self.model.parameters():
-                param.data.clamp_(min=0.0)
-        print("validation non-negativity:")
-        check_non_negativity(self.model, verbose=False)
+            if not self.live_clip:
+                # Save unclipped state to restore after validation
+                self._pre_val_params = copy.deepcopy(self.model.state_dict())
+            self.clip_weights(exclude_biases=self.exclude_bias)
+
+    def on_validation_epoch_end(self):
+        # Restore unclipped weights if not live clipping
+        if self.nn_enabled and not self.live_clip and self._pre_val_params is not None:
+            self.model.load_state_dict(self._pre_val_params)
+            self._pre_val_params = None
 
     def on_test_epoch_start(self):
         if self.noise_injector is not None:
@@ -85,23 +87,22 @@ class LightningMamba(L.LightningModule):
                 self.noise_injector.attach()
             else:
                 self.noise_injector.dettach()
-        print("test non-negativity:")
-        check_non_negativity(self.model, verbose=False)
+        
+        # Non-negativity
+        if self.nn_enabled:
+            if not self.live_clip:
+                self._unclipped_state = copy.deepcopy(self.model.state_dict())
+            self.clip_weights(exclude_biases=self.exclude_bias)
+            
+            if not self.live_clip:
+                self._clipped_state = copy.deepcopy(self.model.state_dict())
+                self._clipped_path = os.path.join(self.trainer.checkpoint_callback.dirpath, "clipped_model.ckpt")
+                torch.save(self._clipped_state, self._clipped_path)
     
     def on_save_checkpoint(self, checkpoint):
         if self.noise_injector is not None:
             if self.noise_injector._is_attached:
                 self.noise_injector.dettach()
-        
-        if self.nn_enabled and self.live_clip and hasattr(self, '_last_unclipped_state'):
-            # Save unclipped model
-            path = self.trainer.checkpoint_callback.dirpath
-            os.makedirs(path, exist_ok=True)
-            unclipped_ckpt = copy.deepcopy(checkpoint)
-            for k, v in self._last_unclipped_state.items():
-                unclipped_ckpt["state_dict"][f"model.{k}"] = v
-            torch.save(unclipped_ckpt, os.path.join(path, "unclipped.ckpt"))
-
 
     def training_step(self, batch, batch_idx):
         loss, metrics = self._shared_eval_step(batch, batch_idx)
@@ -112,12 +113,13 @@ class LightningMamba(L.LightningModule):
         if self.nn_enabled and self.nn_penalty is not None:
             if self.nn_scheduler is not None: # If there is a scheduler, use it to get L2 & L1 weights
                 l2_weight, l1_weight = self.nn_scheduler.get_weights(self.global_step)
-                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=l2_weight, l1_weight=l1_weight)
+                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=l2_weight, l1_weight=l1_weight, exclude_biases=self.exclude_bias)
             else:
-                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=self.nn_weight, l1_weight=self.nn_weight)
+                neg_penalty = compute_negative_penalty(self.model, penalty_type=self.nn_penalty, l2_weight=1.0, l1_weight=1.0, exclude_biases=self.exclude_bias)
 
-            loss = loss + self.nn_weight * neg_penalty
-            train_metrics["nn_penalty"] = neg_penalty
+            nn_loss_contribution = self.nn_weight * neg_penalty
+            loss = loss + nn_loss_contribution
+            train_metrics["nn_penalty"] = nn_loss_contribution
             train_metrics["train_loss"] = loss  # log penalised loss
 
         self.log_dict(train_metrics, prog_bar=True, on_epoch=True, sync_dist=True)
@@ -136,25 +138,20 @@ class LightningMamba(L.LightningModule):
         test_metrics["test_loss"] = loss
         self.log_dict(test_metrics, prog_bar=True, on_epoch=True, sync_dist=True)
 
-        if self.nn_enabled and self.trainer.ckpt_path is None:
-            # Save original weights before loading unclipped model
-            _original_weights = {k: v.clone() for k, v in self.model.state_dict().items()}
-
+        if self.nn_enabled and not self.live_clip:
             # Load unclipped weights
-            state_dict = torch.load(os.path.join(self.trainer.checkpoint_callback.dirpath, "unclipped.ckpt"))["state_dict"]
-            state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
-
-            self.model.load_state_dict(state_dict)
+            self.model.load_state_dict(self._unclipped_state)
             loss_u, metrics_u = self._shared_eval_step(batch, batch_idx)
             unclipped_metrics = {f"test_{k}_unclipped": v for k, v in metrics_u.items()}
             unclipped_metrics["test_loss_unclipped"] = loss_u
             self.log_dict(unclipped_metrics, prog_bar=True, on_epoch=True, sync_dist=True)
 
             # Restore original weights
-            self.model.load_state_dict(_original_weights)
+            self.model.load_state_dict(self._clipped_state)
 
         return test_metrics
     
+    # Utility functions
     def _shared_eval_step(self, batch, batch_idx):
         if self.model.task == 'generation':
             x, y = batch # (B, L)
@@ -198,3 +195,9 @@ class LightningMamba(L.LightningModule):
                     "frequency": 1
                 }
             }
+            
+    def clip_weights(self, exclude_biases = False):
+        for name, param in self.model.named_parameters():
+            if exclude_biases and name.endswith('dt_proj.bias'):
+                continue
+            param.data.clamp_(min=0.0)

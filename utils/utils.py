@@ -113,6 +113,44 @@ def load_config(name: str):
     module = importlib.import_module(f"experiments.{name}")
     return module.config
 
+
+def build_run_name(cfg):
+    """Auto-generate a W&B run name from config fields."""
+    m = cfg["model"]
+    nn = cfg["non_negative"]
+    sched = nn["scheduler"]
+    seed = cfg["seed"]
+
+    arch = f"l{m['num_layers']}d{m['d_state']}"
+
+    acts = [m.get("conv_activation"), m.get("delta_activation"),
+            m.get("gate_activation"), m.get("mlp_act")]
+    acts_str = acts[0] if len(set(acts)) == 1 else "/".join(str(a) for a in acts)
+
+    if not nn["enabled"]:
+        nn_str = "no-nn"
+    elif nn["exclude_bias"]:
+        nn_str = "nn-no-bias"
+    else:
+        nn_str = "full-nn"
+
+    if nn["live_clipping"]:
+        clip_str = f"clip({nn['clip_mode']}{nn['clip_interval']})"
+    else:
+        clip_str = "clip(none)"
+
+    pen_str = f'"{nn["penalty_type"]}" w={nn["penalty_weight"]:.0e}'
+    l2_str = f"l2[{sched['l2_weight_start']},{sched['l2_weight_end']}]"
+    dw_str = f"dw[{sched['delay']},{sched['warmup']}]"
+
+    name = f"{arch}: {nn_str} {clip_str} {pen_str} {l2_str} {dw_str} ({acts_str}) seed={seed}"
+
+    notes = cfg["wandb"].get("notes")
+    if notes:
+        name += f" {notes}"
+
+    return name
+
 def create_scheduler(optimizer, total_steps, warmup=0):
     warmup_steps = int(total_steps*warmup)
     def lr_lambda(current_step):
