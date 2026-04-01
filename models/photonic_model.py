@@ -4,10 +4,10 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as f
+import torch.nn.functional as F
 import math
 import warnings
-from utils.activations import Activation
+from utils.activations import Activation, LinearBounded
 from einops import rearrange, repeat
 from utils.photonic_selective_scan import selective_scan_photonic_fn
 
@@ -20,6 +20,8 @@ class PhotonicMamba(nn.Module):
         conv_activation='silu', 
         delta_activation='softplus', 
         gate_activation='silu',
+        a_max=10,
+        a_min=-10,
         expand=2,
         dt_rank="auto",
         dt_min=0.001,
@@ -63,9 +65,10 @@ class PhotonicMamba(nn.Module):
                 warnings.warn("Photonic Mamba does not support 'use_fast_path'. Setting 'use_fast_path' to False...")
                 self.use_fast_path = False
         
-        self.act = Activation(conv_activation)
+        self.conv_act = Activation(conv_activation)
         self.delta_activation = Activation(delta_activation)
         self.gate_activation = Activation(gate_activation)
+        self.bound = LinearBounded(a_min, a_max)
 
         self.x_proj = nn.Linear(
             self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
@@ -81,7 +84,6 @@ class PhotonicMamba(nn.Module):
         else:
             raise NotImplementedError
 
-        # OLD dt_proj.bias initialization:
         # Initialize dt bias so that pelulike(delta) is between dt_min and dt_max
         dt = torch.exp(
             torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
@@ -98,10 +100,6 @@ class PhotonicMamba(nn.Module):
         # Our initialization would set all Linear.bias to zero, need to mark this one as _no_reinit
         self.dt_proj.bias._no_reinit = True
         
-        # NEW dt_proj.bias initialization 
-        
-        
-        
         # S4D real initialization
         A = repeat(
             torch.arange(1, self.d_state + 1, dtype=torch.float32, device=device),
@@ -117,7 +115,10 @@ class PhotonicMamba(nn.Module):
         self.D._no_weight_decay = True
 
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
-        
+    
+    def _apply_bound(self, x):
+        return self.bound(x)
+    
     def forward(self, hidden_states, inference_params=None):
         # return self.mamba(hidden_states, inference_params)
         """
@@ -135,13 +136,13 @@ class PhotonicMamba(nn.Module):
                 return out
 
         # We do matmul and transpose BLH -> HBL at the same time
-        xz = rearrange(
-            self.in_proj.weight @ rearrange(hidden_states, "b l d -> d (b l)"),
-            "d (b l) -> b d l",
-            l=seqlen,
+        xz = self._apply_bound(
+            rearrange(
+            self.in_proj(rearrange(hidden_states, "b l d -> (b l) d")), 
+            "(b l) d -> b d l",
+            l=seqlen
+            )
         )
-        if self.in_proj.bias is not None:
-            xz = xz + rearrange(self.in_proj.bias.to(dtype=xz.dtype), "d -> d 1")
 
         A = torch.exp(self.A_log.float())  # (d_inner, d_state)
         x, z = xz.chunk(2, dim=1)
@@ -151,17 +152,27 @@ class PhotonicMamba(nn.Module):
             # If we just take x[:, :, -self.d_conv :], it will error if seqlen < self.d_conv
             # Instead F.pad will pad with zeros if seqlen < self.d_conv, and truncate otherwise.
             conv_state.copy_(F.pad(x, (self.d_conv - x.shape[-1], 0)))  # Update state (B D W)
-        x = self.act(self.conv1d(x)[..., :seqlen])
-        
-        # We're careful here about the layout, to avoid extra transposes.
-        # We want dt to have d as the slowest moving dimension
-        # and L as the fastest moving dimension, since those are what the ssm_scan kernel expects.
-        x_dbl = self.x_proj(rearrange(x, "b d l -> (b l) d"))  # (bl d)
-        dt, B, C = torch.split(x_dbl, [self.dt_rank, self.d_state, self.d_state], dim=-1)
-        dt = self.dt_proj.weight @ dt.t()
-        dt = rearrange(dt, "d (b l) -> b d l", l=seqlen)
+        x = self._apply_bound(
+            self.conv_act(self.conv1d(x)[..., :seqlen])
+        )
+
+        # Input-dependent parameters
+        x_dbl = self._apply_bound(
+            self.x_proj(rearrange(x, "b d l -> (b l) d"))
+            )
+        dt, B, C = torch.split(
+            x_dbl, [self.dt_rank, self.d_state, self.d_state], dim=-1
+            )
         B = rearrange(B, "(b l) dstate -> b dstate l", l=seqlen).contiguous()
         C = rearrange(C, "(b l) dstate -> b dstate l", l=seqlen).contiguous()
+        
+        # delta activation and bounding
+        dt = self._apply_bound(
+            rearrange(self.dt_proj(dt), "(b l) dstate -> b dstate l", l=seqlen)
+            )
+        dt = self.delta_activation(dt).clamp(min=1e-4, max=20.0)
+
+        # S6 block: selective scan
         y = selective_scan_photonic_fn(
             x,
             dt,
@@ -169,17 +180,18 @@ class PhotonicMamba(nn.Module):
             B,
             C,
             self.D.float(),
-            z=z,
-            delta_bias=self.dt_proj.bias.float(),
-            delta_activation=self.delta_activation,
-            gate_activation=self.gate_activation,
             return_last_state=ssm_state is not None,
         )
         
+        if z is not None:
+            y = y * self.gate_activation(z)
+            
         if ssm_state is not None:
             y, last_state = y
             ssm_state.copy_(last_state)
-        y = rearrange(y, "b d l -> b l d")
+        y = self._apply_bound(
+            rearrange(y, "b d l -> b l d")
+        )
         out = self.out_proj(y)
         return out
     

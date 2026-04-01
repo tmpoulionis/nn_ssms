@@ -12,6 +12,8 @@ config = {
         "conv_activation": 'nn_pelulike_v2',
         "delta_activation": 'nn_pelulike_v2',
         "gate_activation": 'nn_pelulike_v2',
+        "a_max": 10,
+        "a_min": -10,
         "dt_min": 0.001,
         "dt_max": 0.1,
         "use_prenorm": True,
@@ -63,7 +65,7 @@ config = {
         "noise_std": 0.02
     },
     "non_negative": {
-        "enabled": True,
+        "enabled": False,
         "penalty_type": "elastic",
         "penalty_weight": 1e-1,
         "live_clipping": False,
@@ -85,4 +87,4 @@ config = {
     }
 }
 
-config["wandb"]["name"] = build_run_name(config)
+config["wandb"]["name"] = "l2d16: (nn_elulike_v2)"

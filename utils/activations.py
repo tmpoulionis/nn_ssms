@@ -29,6 +29,8 @@ def Activation(activation=None, size=None, dim=-1):
         return pa.PReSin()
     elif activation == 'pexpsin':
         return pa.PExpSin()
+    elif activation == 'linear_bounded':
+        return LinearBounded()
     elif activation in [ None, 'id', 'identity', 'linear', 'none' ]:
         return nn.Identity()
     elif activation == 'tanh':
@@ -61,6 +63,17 @@ def Activation(activation=None, size=None, dim=-1):
     #     return TransposedLN(dim)
     else:
         raise NotImplementedError("hidden activation '{}' is not implemented".format(activation))
+
+class LinearBounded(nn.Module):
+    """Clamps output to [a_min, a_max]. Differentiable (gradient=0 in saturation)."""
+    def __init__(self, a_min: float = 0.0, a_max: float = 1.0):
+        super().__init__()
+        self.a_min = a_min
+        self.a_max = a_max
+
+    def forward(self, x):
+        return x.clamp(self.a_min, self.a_max)
+
 
 class GLU(nn.Module):
     def __init__(self, dim=-1, activation='sigmoid'):

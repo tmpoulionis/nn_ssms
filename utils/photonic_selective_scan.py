@@ -11,10 +11,6 @@ def selective_scan_photonic_fn(
     B,
     C,
     D=None,
-    z=None,
-    delta_bias=None, 
-    delta_activation=nn.Softplus(),
-    gate_activation=nn.SiLU(),
     return_last_state=False
     ):
     """
@@ -36,14 +32,6 @@ def selective_scan_photonic_fn(
     dtype_in = u.dtype
     u = u.float()
     delta = delta.float()
-    
-    if delta_bias is not None:
-        delta = delta + delta_bias[..., None].float()
-    
-    assert delta_activation is not None, "delta_activation must be provided"
-    assert gate_activation is not None, "gate_activation must be provided"
-    delta = delta_activation(delta)
-    delta = delta.clamp(min=1e-4, max=20.0)
     
     batch, dim, dstate = u.shape[0], A.shape[0], A.shape[1]
     is_variable_B = B.dim() >= 3
@@ -108,9 +96,6 @@ def selective_scan_photonic_fn(
         ys.append(y)
     y = torch.stack(ys, dim=2) # (batch dim L)
     out = y if D is None else y + u * rearrange(D, "d -> d 1")
-    
-    if z is not None:
-        out = out * gate_activation(z)
             
     out = out.to(dtype=dtype_in)
     return out if not return_last_state else (out, last_state)
