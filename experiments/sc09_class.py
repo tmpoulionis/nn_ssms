@@ -2,13 +2,11 @@ from utils.utils import build_run_name
 
 config = {
     "model": {
-        "num_layers": 2,
+        "num_layers": 3,
         "d_model": 64,
-        'vocab_size': None,
         "d_state": 16,
         "d_conv": 4,
         "expand": 2,
-        'task': 'classification',
         "conv_activation": 'nn_pelulike_v2',
         "delta_activation": 'nn_pelulike_v2',
         "gate_activation": 'nn_pelulike_v2',
@@ -24,7 +22,6 @@ config = {
         "dropout": 0.1,
         "use_mlp_prenorm": True,
         "return_last_state": False,
-        "use_fast_path": False
     },
     "trainer": {
         "max_epochs": 30,
@@ -38,6 +35,7 @@ config = {
         "log_every_n_steps": None,
         "detect_anomaly": False
     },
+    "task": "classification",
     "dataset": {
         "dataset_name": "sc09",
         "batch_size": 128,
@@ -51,34 +49,7 @@ config = {
     "lr_scheduler": {
         "warmup": 0.1
         },
-    "noise_injector": {
-        "noise_schedule": {
-            "train": False,
-            "eval": False
-        },
-        "noise_config":
-                {"input": True,
-                "weight": True,
-                "bias": True,
-                "output": True}
-        ,
-        "noise_std": 0.02
-    },
-    "non_negative": {
-        "enabled": False,
-        "penalty_type": "elastic",
-        "penalty_weight": 1e-1,
-        "live_clipping": False,
-        "exclude_bias": True,
-        "clip_mode": "step", # "step" or "epoch"
-        "clip_interval": 25,
-        "scheduler":
-                {"l2_weight_start": 1,
-                "l2_weight_end": 0,
-                "delay": 0,
-                "warmup": 0}
-    },
-    "seed": 42,
+    "seed": None,
     "wandb": {
         "project": None,
         "notes": None,  # optional freeform suffix appended to auto-generated name
@@ -87,4 +58,4 @@ config = {
     }
 }
 
-config["wandb"]["name"] = "l2d16: (nn_elulike_v2)"
+config["wandb"]["name"] = "l3d64: act(nn_elulike_v2) a(-10, 10) run=2"

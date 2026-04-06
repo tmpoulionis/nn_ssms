@@ -8,7 +8,7 @@ from utils.noise_injection import NoiseInjector
 from utils.non_negativity import compute_negative_penalty, NonNegativityScheduler, check_non_negativity
 
 class LightningMamba(L.LightningModule):
-    def __init__(self, model, total_steps, optimizer, loss_fn, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None):
+    def __init__(self, model, total_steps, optimizer, loss_fn, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None, config=None):
         super().__init__()
         self.saved_weights = {}
         self.model = model
@@ -18,6 +18,7 @@ class LightningMamba(L.LightningModule):
         self.optimizer = optimizer
         self.opt_hyperparams = opt_hyperparams if opt_hyperparams is not None else {}
         self.lr_scheduler = lr_scheduler
+        self.config = config
         self.save_hyperparameters(ignore=['model', 'loss_fn'])
         
         # Non-Negativity
@@ -100,6 +101,8 @@ class LightningMamba(L.LightningModule):
                 torch.save(self._clipped_state, self._clipped_path)
     
     def on_save_checkpoint(self, checkpoint):
+        if self.config is not None:
+            checkpoint["experiment_config"] = self.config
         if self.noise_injector is not None:
             if self.noise_injector._is_attached:
                 self.noise_injector.dettach()
@@ -153,7 +156,7 @@ class LightningMamba(L.LightningModule):
     
     # Utility functions
     def _shared_eval_step(self, batch, batch_idx):
-        if self.model.task == 'generation':
+        if self.config['task'] == 'generation':
             x, y = batch # (B, L)
             logits = self.model(x) # (B, L, vocab_size)
 

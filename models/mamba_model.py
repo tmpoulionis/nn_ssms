@@ -1,5 +1,4 @@
-from mamba.mamba_ssm.modules.mamba_simple import Mamba
-from models.photonic_model import PhotonicMamba
+from mamba.mamba_block import MambaBlock
 import torch.nn as nn
 from utils.activations import Activation
 from einops import rearrange
@@ -7,15 +6,11 @@ from einops import rearrange
 class MambaModel(nn.Module):
     '''
     Input shape:  (B, L, D) 
-    
-    d_out, n_heads, head_dims specified only for classification tasks
     '''
     def __init__(
         self,
         num_layers: int,
         d_model: int,
-        vocab_size: int=None,
-        task: str='classification',
         conv_activation: str="silu",
         delta_activation=None,
         gate_activation=None,
@@ -38,15 +33,9 @@ class MambaModel(nn.Module):
         # Mamba Stack
         self.num_layers = num_layers
         self.d_model = d_model
-        self.vocab_size = vocab_size
-        self.task = task
         self.d_out = d_out if d_out is not None else d_model
         self.return_last_state = return_last_state
         self.use_prenorm = use_prenorm
-        
-        # Embedding layer
-        if task == 'generation':
-            self.embedding = nn.Embedding(vocab_size, d_model)
         
         # Create Mamba layers with pre-normalization
         self.mamba_layers = nn.ModuleList()
@@ -57,7 +46,7 @@ class MambaModel(nn.Module):
                 self.layer_norms.append(nn.RMSNorm(d_model))
             
             self.mamba_layers.append(
-                PhotonicMamba(
+                MambaBlock(
                     d_model=d_model,
                     conv_activation=conv_activation,
                     delta_activation=delta_activation,
@@ -68,37 +57,30 @@ class MambaModel(nn.Module):
                     **kwargs
                 )
             )
-            
         self.final_norm = nn.RMSNorm(d_model) if use_final_norm else nn.Identity()
-        
-        # Generation head
-        if task == 'generation':
-            assert vocab_size is not None, "vocab_size must be specified for generation."
-            self.head = nn.Linear(d_model, vocab_size, bias=None)
-        else:
+
         # Classification head
-            mlp_layers = []
-            if mlp_dims is None:
-                self.head = None
-            else:
-                assert mlp_dims[0] == d_model, "First dim in mlp_dims must be d_model."
-                assert mlp_dims[-1] == d_out, "Last dim in mlp_dims must be num_classes."
+        mlp_layers = []
+        if mlp_dims is None:
+            self.head = None
+        else:
+            assert mlp_dims[0] == d_model, "First dim in mlp_dims must be d_model."
+            assert mlp_dims[-1] == d_out, "Last dim in mlp_dims must be num_classes."
 
-                for i in range(len(mlp_dims) - 1):
-                    mlp_layers.append(nn.Linear(mlp_dims[i], mlp_dims[i+1]))
-                    if i < len(mlp_dims) - 2:
-                        if use_mlp_prenorm:
-                            mlp_layers.append(nn.RMSNorm(mlp_dims[i+1]))
-                        mlp_layers.append(Activation(mlp_act))
-
-                        if dropout > 0:
-                            mlp_layers.append(nn.Dropout(dropout))
-                    else:
-                        # Optional output activation
-                        if out_activation is not None:
-                            mlp_layers.append(Activation(out_activation))
-
-            self.head = nn.Sequential(*mlp_layers)
+            for i in range(len(mlp_dims) - 1):
+                mlp_layers.append(nn.Linear(mlp_dims[i], mlp_dims[i+1]))
+                if i < len(mlp_dims) - 2:
+                    if use_mlp_prenorm:
+                        mlp_layers.append(nn.RMSNorm(mlp_dims[i+1]))
+                    mlp_layers.append(Activation(mlp_act))
+                    
+                    if dropout > 0:
+                        mlp_layers.append(nn.Dropout(dropout))
+                else:
+                    # Optional output activation
+                    if out_activation is not None:
+                        mlp_layers.append(Activation(out_activation))
+        self.head = nn.Sequential(*mlp_layers)
         
     def forward(self, x):
         '''
@@ -106,9 +88,6 @@ class MambaModel(nn.Module):
         '''
         
         # print(f"Input: min value: {x.min()} negative values: {(x<0).sum()}/{x.numel()}")
-        if self.task == 'generation':
-            x = self.embedding(x) # (B, L) --> (B, L, d_model)
-        
         for i, mamba_block in enumerate(self.mamba_layers):
             if self.use_prenorm:
                 # Normalize then apply Mamba with residual connection
@@ -121,21 +100,17 @@ class MambaModel(nn.Module):
                 
         x = self.final_norm(x)
         # print(f"After final_norm: min value: {x.min()} negative values: {(x<0).sum()}/{x.numel()}")
-        # Generation forward pass
-        if self.task == 'generation':
-            logits = self.head(x) # (B, L, vocab_size)
-            return logits
-        else:
-        # Classification forward pass
-            last_state = x[:, -1, :] # (B, D)
 
-            if self.head is not None:
-                if self.return_last_state:
-                    return self.head(last_state), last_state 
-                else:
-                    return self.head(last_state) # (B, D_out)
+        # Classification forward pass
+        last_state = x[:, -1, :] # (B, D)
+
+        if self.head is not None:
+            if self.return_last_state:
+                return self.head(last_state), last_state 
             else:
-                return x
+                return self.head(last_state) # (B, D_out)
+        else:
+            return x
         
     def get_last_hidden_state(self, x):
         """"

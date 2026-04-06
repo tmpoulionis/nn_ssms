@@ -1,0 +1,9 @@
+torch
+lightning
+wandb
+einops
+torchmetrics
+torchinfo
+torchaudio
+numpy
+tqdm

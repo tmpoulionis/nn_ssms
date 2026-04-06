@@ -78,7 +78,7 @@ def train(config, checkpoint_path=None):
     
     # ------- Callbacks -------
     print("\n[4/6] Setting up Callbacks...")
-    if MODEL_CONFIG['task'] == 'generation':
+    if config['task'] == 'generation':
         checkpoint_monitor = "val_loss"
         checkpoint_mode = "min"
         checkpoint_filename = "best-{epoch:02d}-{val_loss:.4f}"
@@ -117,7 +117,8 @@ def train(config, checkpoint_path=None):
         loss_fn=loss_fn,
         opt_hyperparams=OPTIMIZER_CONFIG,
         noise_injection=config["noise_injector"],
-        non_negative=config["non_negative"]
+        non_negative=config["non_negative"],
+        config=config
     )
     
     # ------- Trainer -------

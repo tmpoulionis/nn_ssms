@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nn-mamba"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "lightning",
+    "wandb",
+    "einops",
+    "torchmetrics",
+    "torchinfo",
+    "torchaudio",
+    "numpy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+
+[tool.setuptools.packages.find]
+include = [
+    "models*",
+    "utils*",
+    "dataloaders*",
+    "mamba*",
+    "nnt*",
+    "experiments*",
+]

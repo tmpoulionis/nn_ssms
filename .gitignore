@@ -10,3 +10,4 @@ models/__pycache__
 utils/ __pycache__
 CLAUDE.md
 agentic_workflow/
+*.egg-info/
