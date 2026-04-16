@@ -62,7 +62,11 @@ def train(config, checkpoint_path=None):
     
     # ------- Model -------
     print("\n[2/6] Constructing Model...")
-    model = MambaModel(**MODEL_CONFIG, d_out=num_classes)
+    if config.get("task") == "generation":
+        from models.mamba_generation import GenerationMambaModel
+        model = GenerationMambaModel(**MODEL_CONFIG)
+    else:
+        model = MambaModel(**MODEL_CONFIG, d_out=num_classes)
     
     # ------- W&B Logger -------
     print("\n[3/6] Setting up W&B Logger...")

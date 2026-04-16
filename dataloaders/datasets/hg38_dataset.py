@@ -97,9 +97,10 @@ class FastaInterval():
             min_shift = max(start + min_shift, 0) - start
             max_shift = min(end + max_shift, chromosome_length) - end
 
-            rand_shift = randrange(min_shift, max_shift)
-            start += rand_shift
-            end += rand_shift
+            if max_shift > min_shift:
+                rand_shift = randrange(min_shift, max_shift)
+                start += rand_shift
+                end += rand_shift
 
         left_padding = right_padding = 0
 
@@ -158,9 +159,6 @@ class HG38Dataset(torch.utils.data.Dataset):
         fasta_file=None,
         max_length=None,
         root='./data/hg38',
-        pad_max_length=None,
-        tokenizer=None,
-        tokenizer_name=None,
         add_eos=False,
         return_seq_indices=False,
         shift_augs=None,
@@ -173,16 +171,14 @@ class HG38Dataset(torch.utils.data.Dataset):
 
         self.root = Path(root)
         self.max_length = max_length
-        self.pad_max_length = pad_max_length if pad_max_length is not None else max_length
-        self.tokenizer_name = tokenizer_name
         self.tokenizer = CharacterTokenizer(
             characters=self.chars,
             model_max_length=max_length
         )
         self.return_augs = return_augs
         self.add_eos = add_eos
-        self.replace_N_token = replace_N_token  
-        self.pad_interval = pad_interval         
+        self.replace_N_token = replace_N_token
+        self.pad_interval = pad_interval
 
 
         # Set default file paths if not provided
@@ -240,16 +236,20 @@ class HG38Dataset(torch.utils.data.Dataset):
     
     @staticmethod
     def _download_file(url, output_path):
-        """Download a file with progress bar."""
+        """Download a file with progress bar. Atomic: writes to .tmp, renames on success."""
+        tmp_path = output_path.with_suffix(output_path.suffix + '.tmp')
         with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=output_path.name) as t:
-            urlretrieve(url, filename=output_path, reporthook=t.update_to)
-            
+            urlretrieve(url, filename=tmp_path, reporthook=t.update_to)
+        tmp_path.replace(output_path)
+
     @staticmethod
     def _extract_gzip(gz_path, output_path):
-        """Extract a gzip file."""
+        """Extract a gzip file. Atomic: extracts to .tmp, renames on success."""
+        tmp_path = output_path.with_suffix(output_path.suffix + '.tmp')
         with gzip.open(gz_path, 'rb') as f_in:
-            with open(output_path, 'wb') as f_out:
+            with open(tmp_path, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
+        tmp_path.replace(output_path)
                 
     def __len__(self):
         return len(self.df)
@@ -266,31 +266,16 @@ class HG38Dataset(torch.utils.data.Dataset):
 
         seq = self.fasta(chr_name, start, end, max_length=self.max_length, return_augs=self.return_augs)
 
-        if self.tokenizer_name == 'char':
+        seq = self.tokenizer(
+            seq,
+            add_special_tokens=self.add_eos,  # controls adding eos
+            padding="max_length",
+            max_length=self.max_length,
+            truncation=True,
+        )
+        seq = seq["input_ids"]
 
-            seq = self.tokenizer(seq,
-                add_special_tokens=True if self.add_eos else False,  # this is what controls adding eos
-                padding="max_length",
-                max_length=self.max_length,
-                truncation=True,
-            )
-            seq = seq["input_ids"]  # get input_ids
-
-        elif self.tokenizer_name == 'bpe':
-            seq = self.tokenizer(seq, 
-                # add_special_tokens=False, 
-                padding="max_length",
-                max_length=self.pad_max_length,
-                truncation=True,
-            ) 
-            # get input_ids
-            if self.add_eos:
-                seq = seq["input_ids"][1:]  # remove the bos, keep the eos token
-            else:
-                seq = seq["input_ids"][1:-1]  # remove both special tokens
-        
-        # convert to tensor
-        seq = torch.LongTensor(seq)  # hack, remove the initial cls tokens for now
+        seq = torch.LongTensor(seq)
 
         if self.replace_N_token:
             # replace N token with a pad token, so we can ignore it in the loss

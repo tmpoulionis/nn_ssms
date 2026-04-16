@@ -50,7 +50,6 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
             "root": "./data/hg38",
             "subset": ['train', 'valid', 'test'],
             "max_length": 2**17,
-            "tokenizer_name": "char",
             "add_eos": True
         }
     ),

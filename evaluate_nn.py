@@ -3,7 +3,7 @@ Evaluate a trained MambaModel checkpoint and its non-negative isomorphic
 transformation side by side on the test set.
 
 Usage:
-    python evaluate_nn.py -c checkpoints/<run>/best-epoch=XX-val_acc=X.XXXX.ckpt
+    python evaluate_nn.py -c checkpoints/<run>/best-epoch=XX-val_acc=X.XXXX.ckpt 
     python evaluate_nn.py -c <path.ckpt> --a_min -5 --a_max 5   # override bounds
 """
 
@@ -37,8 +37,9 @@ def evaluate(model, dataloader, num_classes, device):
 def main():
     parser = argparse.ArgumentParser(description="Compare original vs NN-isomorphic model on test set.")
     parser.add_argument("--checkpoint", "-c", required=True, help="Path to Lightning .ckpt file.")
-    parser.add_argument("--a_min", type=float, default=None, help="Override a_min for the isomorphic transform.")
-    parser.add_argument("--a_max", type=float, default=None, help="Override a_max for the isomorphic transform.")
+    parser.add_argument("--a_min", type=float, default=-10, help="Override a_min for the isomorphic transform.")
+    parser.add_argument("--a_max", type=float, default=10, help="Override a_max for the isomorphic transform.")
+    parser.add_argument("--nn_validation", "-n", default=None, help="Run non-negativity validation on the NN model. Options: 's': summary, 'p': all-passed, 'f': failures-only.")
     parser.add_argument("--device", type=str, default=None, help="Device (default: auto).")
     args = parser.parse_args()
 
@@ -50,6 +51,7 @@ def main():
     config = ckpt["experiment_config"]
     model_cfg = config["model"]
     dataset_cfg = config["dataset"]
+    nn_validation = args.nn_validation
 
     a_min = args.a_min if args.a_min is not None else model_cfg.get("a_min", 0.0)
     a_max = args.a_max if args.a_max is not None else model_cfg.get("a_max", 1.0)
@@ -97,6 +99,23 @@ def main():
     else:
         print(f"Accuracy difference: {abs(nn_acc - orig_acc):.2e}")
 
-
+    if nn_validation:
+        from nnt.validate_nn import validate_non_negativity
+        sample_input, _ = next(iter(test_loader))
+        sample_input = sample_input.to(device)
+        report = validate_non_negativity(model_nn, sample_input, atol=0)
+        
+        if nn_validation == "s":
+            print("\nNon-negativity validation report (summary):")
+            print(report.summary())
+        elif nn_validation == "p":
+            print("\nNon-negativity validation report (all-passed):")
+            print(report.all_passed())
+        elif nn_validation == "f":
+            print("\nNon-negativity validation report (failures-only):")
+            print(report.failures_only())
+        else:
+            print(f"Invalid nn_validation option: {nn_validation}. Use 's': summary, 'p': all-passed, or 'f': failures-only.")
+    
 if __name__ == "__main__":
     main()

@@ -1,10 +1,8 @@
-from utils.utils import build_run_name
-
 config = {
     "model": {
-        "num_layers": 2,
+        "num_layers": 3,
         "d_model": 64,
-        "d_state": 16,
+        "d_state": 1,
         "d_conv": 4,
         "expand": 2,
         "conv_activation": 'nn_pelulike_v2',
@@ -16,7 +14,7 @@ config = {
         "dt_max": 0.1,
         "use_prenorm": True,
         "use_final_norm": True,
-        "mlp_dims": [64, 128, 10],
+        "mlp_dims": [64, 128, 35],
         "mlp_act": 'nn_pelulike_v2',
         "out_activation": None,
         "dropout": 0.1,
@@ -37,7 +35,7 @@ config = {
     },
     "task": "classification",
     "dataset": {
-        "dataset_name": "sc09",
+        "dataset_name": "speechcommands",
         "batch_size": 128,
     },
     "optimizer": { # Using AdamW
@@ -58,4 +56,4 @@ config = {
     }
 }
 
-config["wandb"]["name"] = "l2d16: act(nn_elulike_v2) a(-10, 10) run=1"
+config["wandb"]["name"] = "[sc35]: l3d1 act(nn_elulike_v2) bs=128 run=1"
