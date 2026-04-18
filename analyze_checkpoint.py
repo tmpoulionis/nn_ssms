@@ -28,16 +28,16 @@ def main():
     )
     parser.add_argument("ckpt_path", help="Path to .ckpt file")
     parser.add_argument(
-        "-e", "--experiment", default="sc09_class",
-        help="Experiment config to load model architecture from (default: sc09_class)"
+        "-e", "--experiment", required=True,
+        help="Experiment config to load model architecture from (module name in experiments/)"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", default=False,
         help="Print per-layer statistics"
     )
     parser.add_argument(
-        "--num-classes", type=int, default=10,
-        help="Number of output classes (default: 10 for SC09)"
+        "--num-classes", type=int, default=None,
+        help="Number of output classes (auto-detected from checkpoint config if available)"
     )
     args = parser.parse_args()
 
@@ -51,8 +51,13 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Loading checkpoint: {args.ckpt_path} (device={device})")
 
-    raw = torch.load(args.ckpt_path, map_location=device)
-    mamba_model = MambaModel(**model_config, d_out=args.num_classes)
+    raw = torch.load(args.ckpt_path, map_location=device, weights_only=False)
+    num_classes = args.num_classes
+    if num_classes is None and "experiment_config" in raw:
+        num_classes = raw["experiment_config"].get("dataset", {}).get("num_classes")
+    if num_classes is None:
+        raise ValueError("Could not auto-detect num_classes. Pass --num-classes explicitly.")
+    mamba_model = MambaModel(**model_config, d_out=num_classes)
 
     if "pytorch-lightning_version" in raw:
         # Full Lightning checkpoint

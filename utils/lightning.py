@@ -2,24 +2,22 @@ import os
 import torch
 import copy
 import lightning as L
-from torchmetrics.functional import accuracy
 from utils.utils import create_scheduler
 from utils.noise_injection import NoiseInjector
 from utils.non_negativity import compute_negative_penalty, NonNegativityScheduler, check_non_negativity
 
 class LightningMamba(L.LightningModule):
-    def __init__(self, model, total_steps, optimizer, loss_fn, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None, config=None):
+    def __init__(self, model, total_steps, optimizer, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None, config=None):
         super().__init__()
         self.saved_weights = {}
         self.model = model
         self.total_steps = total_steps
-        self.loss_fn = loss_fn
         self.lr_scheduler = lr_scheduler
         self.optimizer = optimizer
         self.opt_hyperparams = opt_hyperparams if opt_hyperparams is not None else {}
         self.lr_scheduler = lr_scheduler
         self.config = config
-        self.save_hyperparameters(ignore=['model', 'loss_fn'])
+        self.save_hyperparameters(ignore=['model'])
         
         # Non-Negativity
         if non_negative is not None:
@@ -156,32 +154,11 @@ class LightningMamba(L.LightningModule):
     
     # Utility functions
     def _shared_eval_step(self, batch, batch_idx):
-        if self.config['task'] == 'generation':
-            x, y = batch # (B, L)
-            logits = self.model(x) # (B, L, vocab_size)
-
-            # Flatten for cross_entropy
-            logits_flat = logits.reshape(-1, self.model.vocab_size) # (B*L, vocab_size)
-            targets_flat = y.reshape(-1) # (B*L)
-
-            loss = self.loss_fn(logits_flat, targets_flat)
-            perplexity = torch.exp(loss)
-
-            preds = logits.argmax(dim=-1) # (B, L)
-            token_acc = (preds == y).float().mean()
-
-            # Second-half accuracy: the induction head recall signal
-            mid = y.shape[1] // 2
-            second_half_acc = (preds[:, mid:] == y[:, mid:]).float().mean()
-
-            return loss, {"perplexity": perplexity, "token_acc": token_acc, "second_half_acc": second_half_acc}
-
-        else:
-            x, y = batch
-            y_hat = self.model(x) # (B, D_out)
-            loss = self.loss_fn(y_hat, y)
-            acc = accuracy(y_hat, y, task="multiclass", num_classes=self.model.d_out)
-            return loss, {"acc": acc}
+        x, y = batch
+        logits = self.model(x)
+        loss = self.model.compute_loss(logits, y)
+        metrics = self.model.compute_metrics(logits, y)
+        return loss, metrics
     
     def configure_optimizers(self):
         optimizer = self.optimizer(self.model.parameters(), **self.opt_hyperparams)

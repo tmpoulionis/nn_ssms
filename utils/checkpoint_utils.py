@@ -9,14 +9,17 @@ from utils.non_negativity import check_non_negativity
 from models.mamba_model import MambaModel
 
 
-def get_model_config():
+def get_model_config(experiment):
     """
-    Returns MODEL_CONFIG from sc09_class configuration.
+    Returns MODEL_CONFIG from the given experiment configuration.
+
+    Args:
+        experiment (str): Experiment config name (module in experiments/)
 
     Returns:
         dict: Model configuration dictionary
     """
-    config = load_config('sc09_class')
+    config = load_config(experiment)
     return config["model"]
 
 

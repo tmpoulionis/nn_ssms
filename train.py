@@ -1,10 +1,10 @@
 import argparse
+import copy
 import dataloaders.data as data
 import torch
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from models.mamba_model import MambaModel
 from utils.lightning import LightningMamba
 from utils.noise_injection import NoiseInjector
 
@@ -37,11 +37,15 @@ def train(config, checkpoint_path=None):
     SCHEDULER_CONFIG = config["lr_scheduler"]
     WANDB_CONFIG = config["wandb"]
     
-    if ("noise_injector" not in config) or (not config["noise_injector"]["noise_schedule"]["train"] and not config["noise_injector"]["noise_schedule"]["eval"]):
-        config["noise_injector"] = None
+    noise_cfg = config.get("noise_injector")
+    if noise_cfg is not None:
+        sched = noise_cfg.get("noise_schedule", {})
+        if not sched.get("train") and not sched.get("eval"):
+            noise_cfg = None
 
-    if ("non_negative" not in config) or (not config["non_negative"]["enabled"]):
-        config["non_negative"] = None
+    nn_cfg = config.get("non_negative")
+    if nn_cfg is not None and not nn_cfg.get("enabled"):
+        nn_cfg = None
 
     # ------- Load Dataset and create DataLoaders -------
     print("\n[1/6] Preparing DataLoaders...")
@@ -62,12 +66,13 @@ def train(config, checkpoint_path=None):
     
     # ------- Model -------
     print("\n[2/6] Constructing Model...")
-    if config.get("task") == "generation":
-        from models.mamba_generation import GenerationMambaModel
-        model = GenerationMambaModel(**MODEL_CONFIG)
-    else:
-        model = MambaModel(**MODEL_CONFIG, d_out=num_classes)
-    
+    model_cls = config["model_class"]
+    model = model_cls(**MODEL_CONFIG)
+    if num_classes is not None and getattr(model, "d_out", None) is not None:
+        assert model.d_out == num_classes, (
+            f"model.d_out={model.d_out} does not match dataset num_classes={num_classes}"
+        )
+
     # ------- W&B Logger -------
     print("\n[3/6] Setting up W&B Logger...")
     usrname = handle_wandb_login(WANDB_CONFIG)
@@ -82,15 +87,10 @@ def train(config, checkpoint_path=None):
     
     # ------- Callbacks -------
     print("\n[4/6] Setting up Callbacks...")
-    if config['task'] == 'generation':
-        checkpoint_monitor = "val_loss"
-        checkpoint_mode = "min"
-        checkpoint_filename = "best-{epoch:02d}-{val_loss:.4f}"
-    else:
-        checkpoint_monitor = "val_acc"
-        checkpoint_mode = "max"
-        checkpoint_filename = "best-{epoch:02d}-{val_acc:.4f}"
-        
+    checkpoint_monitor = model_cls.checkpoint_metric
+    checkpoint_mode = model_cls.checkpoint_mode
+    checkpoint_filename = f"best-{{epoch:02d}}-{{{checkpoint_monitor}:.4f}}"
+
     callbacks = [
         LearningRateMonitor(logging_interval='step'),
         ModelCheckpoint(
@@ -111,17 +111,14 @@ def train(config, checkpoint_path=None):
     
     # ------- Lightning Module -------
     print("\n[5/6) Setting up Lightning Module...")
-    loss_fn = torch.nn.CrossEntropyLoss()
-    
     lightning_module = LightningMamba(
         model=model,
         total_steps=total_steps,
         optimizer=torch.optim.AdamW,
         lr_scheduler=SCHEDULER_CONFIG,
-        loss_fn=loss_fn,
         opt_hyperparams=OPTIMIZER_CONFIG,
-        noise_injection=config["noise_injector"],
-        non_negative=config["non_negative"],
+        noise_injection=noise_cfg,
+        non_negative=nn_cfg,
         config=config
     )
     
@@ -184,7 +181,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment', '-e', required=True, help="Which experiment config file from ./experiments to run.")
     parser.add_argument('--checkpoint', '-c', default=None, help="Path to checkpoint. Skips training and runs test only.")
+    parser.add_argument('--iterations', '-i', type=int, default=1, help="How many times to run an experiment.")
     args = parser.parse_args()
     
-    config = load_config(args.experiment)
-    trainer, model = train(config, checkpoint_path=args.checkpoint)
+    for i in range(args.iterations):
+        config = load_config(args.experiment)
+        trainer, model = train(config, checkpoint_path=args.checkpoint)

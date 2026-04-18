@@ -183,8 +183,64 @@ class CopyingEvalDataset(torch.utils.data.TensorDataset):
         super().__init__(all_x, all_y)
 
 def copying_static_dataset(L, M, A, variable, samples):
-    
+
     all_x, all_y = torch_copying_data(L, M, A, variable, batch_shape=(samples,))
     print("Constructing Copying dataset of shape", all_x.shape)
     ds = torch.utils.data.TensorDataset(all_x, all_y)
     return ds
+
+class SelectiveCopyingData(Dataset):
+
+    def __init__(self, subset, L=1000, M=10, A=10, samples=None,
+                 variable=True, variable_length=False, one_hot=False,
+                 reverse=False, lag=False, **kwargs):
+        self.L = L
+        self.M = M
+        self.seq_len = M + L + M
+        self.samples = samples
+
+        if subset == 'train':
+            self.dataset = CopyingTrainDataset(
+                L, M, A, self.samples, lag=lag, variable=variable,
+                variable_length=variable_length, one_hot=one_hot, reverse=reverse,
+            )
+        else:
+            self.dataset = CopyingEvalDataset(
+                L, M, A, self.samples, lag=lag, variable=variable,
+                variable_length=variable_length, one_hot=one_hot, reverse=reverse,
+            )
+
+    def __getitem__(self, idx):
+        x, y = self.dataset[idx]
+        # Pad target to full sequence length: [-100 ... | -100 ... | tokens]
+        y_full = torch.full((self.seq_len,), -100, dtype=y.dtype)
+        y_full[-self.M:] = y
+        return x, y_full
+
+    def __len__(self):
+        return len(self.dataset)
+    
+class SelectiveCopyingDataset():
+    
+    def __init__(self,  n_train=50000, n_valid=5000, n_test=5000, L=1000, M=10, A=10,
+            variable=True, variable_length=False, one_hot=False,
+            reverse=False, lag=False, **kwargs):
+        
+        # Create subsets using SelectiveCopyData 
+        self.train = SelectiveCopyingData(L=L, M=M, A=A, subset='train', samples=n_train, lag=lag, variable=variable,
+                variable_length=variable_length, one_hot=one_hot, reverse=reverse,)
+        self.valid = SelectiveCopyingData(L=L, M=M, A=A, subset='valid', samples=n_valid, lag=lag, variable=variable,
+                variable_length=variable_length, one_hot=one_hot, reverse=reverse,)
+        self.test = SelectiveCopyingData(L=L, M=M, A=A, subset='test', samples=n_test, lag=lag, variable=variable,
+                variable_length=variable_length, one_hot=one_hot, reverse=reverse,)
+        self.A = A
+        
+    def process(self):
+        pass
+    
+    def create_dataset(self):
+        return {
+            "train": self.train,
+            "valid": self.valid,
+            "test": self.test
+        }, self.A

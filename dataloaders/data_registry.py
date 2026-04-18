@@ -1,7 +1,9 @@
 from torch.nn.utils.rnn import pad_sequence
 from dataloaders.datasets.sc_dataset import SCDataset, sc_custom_collate
 from dataloaders.datasets.hg38_dataset import HG38Dataset
-from dataloaders.datasets.induction_heads_dataset import InductionHeadsDataset
+from dataloaders.datasets.induction_heads import InductionHeadsDataset
+from dataloaders.datasets.selective_copying import SelectiveCopyingDataset
+from dataloaders.datasets.cifar10 import sCIFAR10Dataset
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Type
 from torch.utils.data import Dataset
@@ -24,7 +26,6 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
         collate_fn=sc_custom_collate,
         default_params={
             "root": "./data/speechcommands",
-            "subset": ["training", "validation", "testing"],
             "mel_transform": True,
             "n_mels": 64,
             "n_fft": 400,
@@ -36,7 +37,6 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
         collate_fn=sc_custom_collate,
         default_params={
             "root": "./data/sc09",
-            "subset": ["training", "validation", "testing"],
             "mel_transform": True,
             "n_mels": 64,
             "n_fft": 400,
@@ -48,7 +48,6 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
         dataset_class=HG38Dataset,
         default_params={
             "root": "./data/hg38",
-            "subset": ['train', 'valid', 'test'],
             "max_length": 2**17,
             "add_eos": True
         }
@@ -56,9 +55,27 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
     "induction_heads": DatasetConfig(
         dataset_class=InductionHeadsDataset,
         default_params={
-            "subset": ['train', 'valid', 'test'],
             "seq_len": 256,
             "vocab_size": 16,
         }
-    )
+    ),
+    "selective_copying": DatasetConfig(
+        dataset_class=SelectiveCopyingDataset,
+        default_params={
+            "n_train": 10000,
+            "n_val": 1000,
+            "n_test":1000,
+            "L": 1000,
+            "M": 10,
+            "A": 10,
+            "variable": True,
+        }
+    ),
+    "scifar10": DatasetConfig(
+        dataset_class=sCIFAR10Dataset,
+        default_params={
+            "root": "./data/cifar10",
+            "download": True,
+        }
+    ),
 }

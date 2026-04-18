@@ -14,9 +14,7 @@ from urllib.request import urlretrieve
 from tqdm import tqdm
 from dataloaders.datasets.hg38_char_tokenizer import CharacterTokenizer
 """
-
 Dataset for sampling arbitrary intervals from the human genome.
-
 """
 
 # Utility classes

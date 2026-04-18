@@ -1,12 +1,12 @@
-from models.mamba_induction_heads import InductionHeadsMambaModel
+from models.mamba_selective_copying import SelectiveCopyingMambaModel
 
 config = {
-    "model_class": InductionHeadsMambaModel,
+    "model_class": SelectiveCopyingMambaModel,
     "model": {
         "num_layers": 2,
-        "d_model": 64,
-        "vocab_size": 16,
-        "d_state": 16,
+        "d_model": 32,
+        "vocab_size": 10,
+        "d_state": 8,
         "d_conv": 4,
         "expand": 2,
         "conv_activation": "nn_pelulike_v2",
@@ -17,45 +17,48 @@ config = {
         "dropout": 0.0,
     },
     "trainer": {
-        "max_epochs": 20,
-        "max_steps": None,
+        "max_epochs": 50,
+        "max_steps": 1e+10,
         "accelerator": "auto",
-        "devices": 1,
+        "devices": 2,
         "enable_checkpointing": True,
-        "gradient_clip_val": 1.0,
+        "gradient_clip_val": 0.1,
         "max_time": None,
         "enable_progress_bar": True,
         "log_every_n_steps": None,
-        "detect_anomaly": False
+        "detect_anomaly": False,
     },
     "dataset": {
-        "dataset_name": "induction_heads",
-        "batch_size": 64,
+        "dataset_name": "selective_copying",
+        "batch_size": 128,
+        "L": 400,
+        "M": 10,
+        "A": 10
     },
     "optimizer": {
         "lr": 1e-3,
         "weight_decay": 0.01,
         "betas": (0.9, 0.95),
-        "eps": 1e-8
+        "eps": 1e-8,
     },
     "lr_scheduler": {
-        "warmup": 0.1
+        "warmup": 0.1,
     },
     "noise_injector": {
         "noise_schedule": {
             "train": False,
-            "eval": False
+            "eval": False,
         },
         "noise_config": {
             "input": True,
             "weight": True,
             "bias": True,
-            "output": True
+            "output": True,
         },
-        "noise_std": 0.02
+        "noise_std": 0.02,
     },
     "non_negative": {
-        "enabled": True,
+        "enabled": False,
         "penalty_type": "elastic",
         "penalty_weight": 5e-1,
         "live_clipping": True,
@@ -66,14 +69,14 @@ config = {
             "l2_weight_start": 1,
             "l2_weight_end": 0,
             "delay": 0,
-            "warmup": 0.4
-        }
+            "warmup": 0.4,
+        },
     },
-    "seed": 42,
+    "seed": None,
     "wandb": {
         "project": None,
-        "name": "induction_heads: nn_pelulike_v2 elastic w=5e-1 clip(1) seed=42",
+        "name": "selective_copying: d32-l2-s8 nn_pelulike_v2 L=400 M=10 A=10 bs=128 seed=None",
         "username": "tmpoulionis-",
-        "mode": 1
-    }
+        "mode": 1,
+    },
 }
