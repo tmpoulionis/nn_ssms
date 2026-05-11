@@ -4,7 +4,7 @@ import torchaudio
 import torchaudio.datasets as datasets
 from torch.nn.utils.rnn import pad_sequence
 
-class SCDataset(datasets.SPEECHCOMMANDS):
+class SCSubset(datasets.SPEECHCOMMANDS):
     """
     Custom PyTorch Dataset for the Speech Commands V0.02 dataset.
     This class extends torchaudio.datasets.SPEECHCOMMANDS to:
@@ -12,7 +12,7 @@ class SCDataset(datasets.SPEECHCOMMANDS):
         - Allows filtering the dataset to include only a specific set of labels (e.g., 'sc09').
         - Maps string labels to integer indices (0 to num_classes-1).
     """
-    
+
     def __init__(self, subset, root='./data/speechcommands', mel_transform=True, n_mels=64, n_fft=400, hop_length=150, filter_labels=None):
         
         if not os.path.exists(root):
@@ -33,19 +33,19 @@ class SCDataset(datasets.SPEECHCOMMANDS):
         # IMPORTANT: Get all labels by accessing parent class directly
         # This avoids calling our __getitem__ before filtered_indices is set
         all_labels = sorted(list(set(
-            super(SCDataset, self).__getitem__(i)[2] 
-            for i in range(super(SCDataset, self).__len__())
+            super(SCSubset, self).__getitem__(i)[2]
+            for i in range(super(SCSubset, self).__len__())
         )))
-        
+
         if filter_labels is not None:
             self.labels = [label for label in all_labels if label in filter_labels]
             self.data_indices = [
-                i for i in range(super(SCDataset, self).__len__())
-                if super(SCDataset, self).__getitem__(i)[2] in filter_labels
+                i for i in range(super(SCSubset, self).__len__())
+                if super(SCSubset, self).__getitem__(i)[2] in filter_labels
             ]
         else:
             self.labels = all_labels
-            self.data_indices = list(range(super(SCDataset, self).__len__()))
+            self.data_indices = list(range(super(SCSubset, self).__len__()))
             
         self.label_to_index = {
             label: i for i, label in enumerate(self.labels)
@@ -76,6 +76,29 @@ class SCDataset(datasets.SPEECHCOMMANDS):
     @property
     def num_classes(self):
         return len(self.labels)
+
+
+class SCDataset:
+    """Factory matching the nn_mamba pipeline contract (process + create_dataset)."""
+
+    def __init__(self, root='./data/speechcommands', mel_transform=True, n_mels=64, n_fft=400, hop_length=150, filter_labels=None, **kwargs):
+        self.subset_kwargs = dict(
+            root=root,
+            mel_transform=mel_transform,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            filter_labels=filter_labels,
+        )
+
+    def process(self):
+        pass
+
+    def create_dataset(self):
+        train = SCSubset(subset="training",   **self.subset_kwargs)
+        valid = SCSubset(subset="validation", **self.subset_kwargs)
+        test  = SCSubset(subset="testing",    **self.subset_kwargs)
+        return {"train": train, "valid": valid, "test": test}, train.num_classes
 
 
 def sc_custom_collate(batch):

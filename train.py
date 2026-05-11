@@ -16,7 +16,7 @@ import time
 torch.set_float32_matmul_precision('medium') # or 'high'
 
     
-def train(config, checkpoint_path=None):
+def train(config, resume_path=None):
     """
     Main training function with full W&B integration.
     
@@ -46,6 +46,10 @@ def train(config, checkpoint_path=None):
     nn_cfg = config.get("non_negative")
     if nn_cfg is not None and not nn_cfg.get("enabled"):
         nn_cfg = None
+
+    quant_cfg = config.get("quantization")
+    if quant_cfg is not None and not quant_cfg.get("enabled"):
+        quant_cfg = None
 
     # ------- Load Dataset and create DataLoaders -------
     print("\n[1/6] Preparing DataLoaders...")
@@ -81,7 +85,7 @@ def train(config, checkpoint_path=None):
         project=WANDB_CONFIG["project"],
         entity=usrname,
         name=WANDB_CONFIG["name"],
-        log_model="all"
+        log_model=False
     )
     
     
@@ -94,7 +98,7 @@ def train(config, checkpoint_path=None):
     callbacks = [
         LearningRateMonitor(logging_interval='step'),
         ModelCheckpoint(
-            dirpath=f"./checkpoints/{WANDB_CONFIG['name']}",
+            dirpath=f"./checkpoints/{WANDB_CONFIG['project']}/{WANDB_CONFIG['name']}",
             filename=checkpoint_filename,
             monitor=checkpoint_monitor,
             mode=checkpoint_mode,
@@ -103,7 +107,7 @@ def train(config, checkpoint_path=None):
         ),
         EarlyStopping(
             monitor="val_loss",
-            patience=100,
+            patience=20,
             mode="min",
             verbose=True
         )
@@ -119,6 +123,7 @@ def train(config, checkpoint_path=None):
         opt_hyperparams=OPTIMIZER_CONFIG,
         noise_injection=noise_cfg,
         non_negative=nn_cfg,
+        quantization=quant_cfg,
         config=config
     )
     
@@ -155,20 +160,17 @@ def train(config, checkpoint_path=None):
     print("="*70 + "\n")
     
     try:
-        if checkpoint_path is None:
-            trainer.fit(lightning_module, train_loader, val_loader)
-            ckpt = "best"
-        else:
-            print(f"Loading checkpoint from {checkpoint_path} and running test evaluation...")
-            ckpt = checkpoint_path
+        if resume_path is not None:
+            print(f"Resuming training from {resume_path}")
+        trainer.fit(lightning_module, train_loader, val_loader, ckpt_path=resume_path)
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user!")
-        
+
     print("\n" + "="*70)
     print("RUNNING TEST EVALUATION")
     print("="*70 + "\n")
-    
-    trainer.test(lightning_module, test_loader, ckpt_path=ckpt)
+
+    trainer.test(lightning_module, test_loader, ckpt_path="best")
     
     elapsed = time.time() - start_time
     print(f"Total training time: {format_time(elapsed)}")
@@ -180,10 +182,12 @@ def train(config, checkpoint_path=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment', '-e', required=True, help="Which experiment config file from ./experiments to run.")
-    parser.add_argument('--checkpoint', '-c', default=None, help="Path to checkpoint. Skips training and runs test only.")
+    parser.add_argument('--resume', '-r', default=None, help="Path to a .ckpt to resume training from.")
     parser.add_argument('--iterations', '-i', type=int, default=1, help="How many times to run an experiment.")
     args = parser.parse_args()
-    
+
     for i in range(args.iterations):
         config = load_config(args.experiment)
-        trainer, model = train(config, checkpoint_path=args.checkpoint)
+        if config.get("seed") is not None:
+            config["seed"] += i
+        trainer, model = train(config, resume_path=args.resume)

@@ -25,6 +25,7 @@ from einops import rearrange
 from nnt.nn_linear import IsomorphicLinear
 from nnt.nn_conv1d import IsomorphicConv1D
 from nnt.nn_mamba_block import NNMambaBlock
+from nnt.nn_embedding import IsomorphicEmbedding
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +75,31 @@ class ValidationReport:
             )
         return "\n".join(lines)
 
+    def failures_only_summary(self) -> str:
+        """Report only violating checks; print a one-liner if everything passed."""
+        failures = self.failures_only()
+        n_checks = len(self.checks)
+
+        if not failures:
+            return (
+                f"Non-Negativity Validation: PASSED "
+                f"— no violations across {n_checks} checks."
+            )
+
+        lines = [
+            "Non-Negativity Validation: FAILED",
+            f"Total checks: {n_checks}, Failures: {len(failures)}",
+            "",
+            f"{'Layer':<50} {'Check':<25} {'Status':<8} {'Violations':<12} {'Min Value'}",
+            "-" * 110,
+        ]
+        for c in failures:
+            lines.append(
+                f"{c.layer_name:<50} {c.check_name:<25} {'FAIL':<8} "
+                f"{c.num_violations:<12} {c.min_value:.6e}"
+            )
+        return "\n".join(lines)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -110,6 +136,9 @@ def _check_static_params(model: torch.nn.Module, atol: float) -> list[CheckResul
             results.append(_check_tensor(name, "D_pos >= 0", module.D_pos.data, atol))
             results.append(_check_tensor(name, "D_neg_abs >= 0", module.D_neg_abs.data, atol))
             results.append(_check_tensor(name, "c_D >= 0", module.c_D, atol))
+        elif isinstance(module, IsomorphicEmbedding):
+            results.append(_check_tensor(name, "W_pos >= 0", module.W_pos.data, atol))
+            results.append(_check_tensor(name, "W_neg_abs >= 0", module.W_neg_abs.data, atol))
         elif isinstance(module, nn.RMSNorm):
             results.append(_check_tensor(name, "gamma >= 0", module.weight.data, atol))
     return results
@@ -132,6 +161,21 @@ def _conv1d_hook(module, input, output, *, results: list, name: str, atol: float
     ax = F.pad(module.a_max - x, (p, p), value=module.a_max.item())
     results.append(_check_tensor(name, "pad(x+abs_amin) >= 0", xp, atol))
     results.append(_check_tensor(name, "pad(a_max-x) >= 0", ax, atol))
+
+
+def _embedding_hook(module, input, output, *, results: list, name: str, atol: float):
+    # Re-compute the two rails: each must be non-negative before feeding downstream matmuls.
+    x = input[0]
+    pos = F.embedding(
+        x, module.W_pos, module.padding_idx, module.max_norm,
+        module.norm_type, module.scale_grad_by_freq, module.sparse,
+    )
+    neg = F.embedding(
+        x, module.W_neg_abs, module.padding_idx, module.max_norm,
+        module.norm_type, module.scale_grad_by_freq, module.sparse,
+    )
+    results.append(_check_tensor(name, "W_pos[x] >= 0", pos, atol))
+    results.append(_check_tensor(name, "W_neg_abs[x] >= 0", neg, atol))
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +281,12 @@ def validate_non_negativity(
         elif isinstance(module, IsomorphicConv1D):
             h = module.register_forward_hook(
                 functools.partial(_conv1d_hook, results=results, name=name, atol=atol)
+            )
+            handles.append(h)
+
+        elif isinstance(module, IsomorphicEmbedding):
+            h = module.register_forward_hook(
+                functools.partial(_embedding_hook, results=results, name=name, atol=atol)
             )
             handles.append(h)
 

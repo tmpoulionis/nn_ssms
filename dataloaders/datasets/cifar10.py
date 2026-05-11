@@ -6,6 +6,8 @@ from torchvision.transforms import ToTensor, Compose, Lambda
 # standard constants for CIFAR10 normalization
 CIFAR10_STD = torch.tensor([0.2023, 0.1994, 0.2010])
 
+WINDOW = 11
+HOP = 10
 
 class sCIFAR10Dataset():
     def __init__(
@@ -31,8 +33,10 @@ class sCIFAR10Dataset():
 
         def process_sample(img):
             x = img.permute(1, 2, 0) # (32, 32, 3)
-            x = x / CIFAR10_STD # Normalize - non-negative values   
+            x = x / CIFAR10_STD # Normalize - non-negative values
             x = x.reshape(-1, 3) # (1024, 3)
+            x = x.unfold(0, WINDOW, HOP) # (102, 3, 11) view
+            x = x.reshape(x.shape[0], -1) # (102, 33)
             return x
 
         # Append custom logic to the existing transform pipeline

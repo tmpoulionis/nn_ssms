@@ -4,9 +4,9 @@ config = {
     "model_class": SelectiveCopyingMambaModel,
     "model": {
         "num_layers": 2,
-        "d_model": 32,
-        "vocab_size": 10,
-        "d_state": 4,
+        "d_model": 64,
+        "vocab_size": 8192,
+        "d_state": 8,
         "d_conv": 4,
         "expand": 2,
         "conv_activation": "nn_pelulike_v2",
@@ -29,14 +29,11 @@ config = {
         "detect_anomaly": False,
     },
     "dataset": {
-        "dataset_name": "selective_copying",
+        "dataset_name": "mqar",
         "batch_size": 64,
         "n_train": 50_000,
         "n_valid": 5_000,
-        "n_test": 5_000,
-        "L": 100,
-        "M": 10,
-        "A": 10
+        "n_test": 5_000
     },
     "optimizer": {
         "lr": 1e-3,
@@ -49,8 +46,8 @@ config = {
     },
     "seed": 0,
     "wandb": {
-        "project": "selective_copying",
-        "name": "d32-l2-s4 nn_pelulike_v2 batch=64",
+        "project": "mqar2",
+        "name": "d64-l2-s8 nn_pelulike_v2 batch=64",
         "username": "tmpoulionis-",
         "mode": 1,
     },

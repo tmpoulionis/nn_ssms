@@ -5,9 +5,10 @@ import lightning as L
 from utils.utils import create_scheduler
 from utils.noise_injection import NoiseInjector
 from utils.non_negativity import compute_negative_penalty, NonNegativityScheduler, check_non_negativity
+from utils.quantization import QuantizationManager
 
 class LightningMamba(L.LightningModule):
-    def __init__(self, model, total_steps, optimizer, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None, config=None):
+    def __init__(self, model, total_steps, optimizer, lr_scheduler=None, opt_hyperparams=None, noise_injection=None, non_negative=None, quantization=None, config=None):
         super().__init__()
         self.saved_weights = {}
         self.model = model
@@ -47,6 +48,15 @@ class LightningMamba(L.LightningModule):
         else:
             self.noise_injector = None
 
+        # Quantization Aware Training
+        self.qat_cfg = quantization
+        self.qat_manager = None
+        if self.qat_cfg is not None and self.qat_cfg.get("enabled", False):
+            self.qat_manager = QuantizationManager(self.model, self.qat_cfg)
+            self.qat_manager.set_quant_mode(self.qat_cfg.get("train_quant", True))
+            self.qat_manager.enable_observer()
+            self.qat_manager.disable_fake_quant()  # calibration phase
+
     def forward(self, x):
         return self.model(x)
     
@@ -54,11 +64,20 @@ class LightningMamba(L.LightningModule):
         if self.noise_injector is not None:
             if self.noise_schedule["train"]:
                 self.noise_injector.attach()
+        if self.qat_manager is not None:
+            self.qat_manager.set_quant_mode(self.qat_cfg.get("train_quant", True))
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         # Non-negativity
         if self.nn_enabled and self.live_clip and self.clip_mode == "step" and (self.global_step % self.clip_interval == 0):
             self.clip_weights(exclude_biases=self.exclude_bias)
+        # QAT: switch from calibration to fake-quant; optionally freeze observers
+        if self.qat_manager is not None:
+            if self.global_step == self.qat_cfg.get("calibration_steps", 0):
+                self.qat_manager.enable_fake_quant()
+            fos = self.qat_cfg.get("freeze_observer_step")
+            if fos is not None and self.global_step == fos:
+                self.qat_manager.freeze_observers()
 
     def on_validation_epoch_start(self):
         if self.noise_injector is not None:
@@ -66,7 +85,10 @@ class LightningMamba(L.LightningModule):
                 self.noise_injector.attach()
             else:
                 self.noise_injector.dettach()
-                
+
+        if self.qat_manager is not None:
+            self.qat_manager.set_quant_mode(self.qat_cfg.get("eval_quant", True))
+
         # Non-negativity
         if self.nn_enabled:
             if not self.live_clip:
@@ -86,7 +108,10 @@ class LightningMamba(L.LightningModule):
                 self.noise_injector.attach()
             else:
                 self.noise_injector.dettach()
-        
+
+        if self.qat_manager is not None:
+            self.qat_manager.set_quant_mode(self.qat_cfg.get("eval_quant", True))
+
         # Non-negativity
         if self.nn_enabled:
             if not self.live_clip:
@@ -101,6 +126,12 @@ class LightningMamba(L.LightningModule):
     def on_save_checkpoint(self, checkpoint):
         if self.config is not None:
             checkpoint["experiment_config"] = self.config
+        try:
+            run_id = getattr(self.logger, "experiment", None) and self.logger.experiment.id
+        except Exception:
+            run_id = None
+        if run_id is not None:
+            checkpoint["wandb_run_id"] = run_id
         if self.noise_injector is not None:
             if self.noise_injector._is_attached:
                 self.noise_injector.dettach()

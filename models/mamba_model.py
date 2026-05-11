@@ -1,6 +1,8 @@
 from mamba.mamba_block import MambaBlock
 import torch.nn as nn
 
+from utils.activations import LinearBounded
+
 
 class MambaModel(nn.Module):
     """
@@ -23,6 +25,8 @@ class MambaModel(nn.Module):
         expand: int = 2,
         use_prenorm: bool = True,
         use_final_norm: bool = True,
+        a_min: float = -10.0,
+        a_max: float = 10.0,
         **kwargs,
     ):
         super().__init__()
@@ -47,10 +51,13 @@ class MambaModel(nn.Module):
                     d_state=d_state,
                     d_conv=d_conv,
                     expand=expand,
+                    a_min=a_min,
+                    a_max=a_max,
                     **kwargs,
                 )
             )
         self.final_norm = nn.RMSNorm(d_model) if use_final_norm else nn.Identity()
+        self.final_bound = LinearBounded(a_min, a_max) if use_final_norm else nn.Identity()
 
     def forward(self, x):
         for i, mamba_block in enumerate(self.mamba_layers):
@@ -58,4 +65,4 @@ class MambaModel(nn.Module):
                 x = mamba_block(self.layer_norms[i](x)) + x
             else:
                 x = mamba_block(x) + x
-        return self.final_norm(x)
+        return self.final_bound(self.final_norm(x))

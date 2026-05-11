@@ -4,6 +4,7 @@ from dataloaders.datasets.hg38_dataset import HG38Dataset
 from dataloaders.datasets.induction_heads import InductionHeadsDataset
 from dataloaders.datasets.selective_copying import SelectiveCopyingDataset
 from dataloaders.datasets.cifar10 import sCIFAR10Dataset
+from dataloaders.datasets.mqar import MQARDataset
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Type
 from torch.utils.data import Dataset
@@ -62,20 +63,35 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
     "selective_copying": DatasetConfig(
         dataset_class=SelectiveCopyingDataset,
         default_params={
-            "n_train": 10000,
-            "n_val": 1000,
-            "n_test":1000,
+            "n_train": 100_000,
+            "n_val": 10_000,
+            "n_test": 10_000,
             "L": 1000,
             "M": 10,
             "A": 10,
             "variable": True,
-        }
+        } 
     ),
     "scifar10": DatasetConfig(
         dataset_class=sCIFAR10Dataset,
         default_params={
             "root": "./data/cifar10",
             "download": True,
+        }
+    ),
+    "mqar": DatasetConfig(
+        dataset_class=MQARDataset,
+        default_params={
+            "n_train": 100_000,
+            "n_valid": 10_000,
+            "n_test": 10_000,
+            "vocab_size": 8192,
+            "input_seq_len": 64,
+            "num_kv_pairs": 8,
+            "power_a": 0.01,
+            "num_passes": 1,
+            "random_non_queries": True,
+            "seed": 42
         }
     ),
 }

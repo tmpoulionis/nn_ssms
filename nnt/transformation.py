@@ -1,57 +1,45 @@
 import copy
-import warnings
 
 import torch.nn as nn
 from mamba.mamba_block import MambaBlock
+
 from nnt.nn_mamba_block import NNMambaBlock
 from nnt.nn_linear import IsomorphicLinear
+from nnt.nn_embedding import IsomorphicEmbedding
 
 
-def _replace_head_linears(head: nn.Sequential, a_min: float, a_max: float) -> nn.Sequential:
-    """Replace nn.Linear layers inside an nn.Sequential with IsomorphicLinear."""
-    new_layers = []
-    for layer in head:
-        if isinstance(layer, nn.Linear):
-            new_layers.append(IsomorphicLinear(layer, a_min=a_min, a_max=a_max))
+def _transform_in_place(module: nn.Module, a_min: float, a_max: float) -> None:
+    """
+    Recursively replace submodules with their non-negative isomorphic equivalents.
+
+    Replacements (leaves — not recursed into):
+      - MambaBlock   -> NNMambaBlock   (handles its own inner Linear/Conv1D swaps)
+      - nn.Linear    -> IsomorphicLinear
+      - nn.Embedding -> IsomorphicEmbedding
+
+    All other modules (RMSNorm, Dropout, activations, wrapper containers) are
+    traversed but left structurally intact.
+    """
+    for name, child in list(module.named_children()):
+        if isinstance(child, MambaBlock):
+            setattr(module, name, NNMambaBlock(child, a_min=a_min, a_max=a_max))
+        elif isinstance(child, nn.Linear):
+            setattr(module, name, IsomorphicLinear(child, a_min=a_min, a_max=a_max))
+        elif isinstance(child, nn.Embedding):
+            setattr(module, name, IsomorphicEmbedding(child))
         else:
-            new_layers.append(layer)
-    return nn.Sequential(*new_layers)
+            _transform_in_place(child, a_min, a_max)
 
 
 def transform_to_nn(model, a_min: float = 0.0, a_max: float = 1.0) -> nn.Module:
     """
-    Return a deep-copied of a MambaModel with all weight matrices isomorphically
-    transformed to be non-negative.  Mathematically equivalent to the original
-    for inputs in [a_min, a_max].
+    Return a deep-copy of `model` with all MambaBlock, nn.Linear, and
+    nn.Embedding submodules isomorphically transformed to be non-negative.
 
-    Replaces:
-      - Each MambaBlock       -> NNMambaBlock
-      - MLP head nn.Linear    -> IsomorphicLinear
-
-    RMSNorm, Dropout, Activation, Embedding layers are left unchanged.
+    Mathematically equivalent to the original for inputs in [a_min, a_max].
+    Works for raw MambaModel as well as task-specific wrapper models
+    (e.g. CIFARMambaModel, SelectiveCopyingMambaModel).
     """
     model_nn = copy.deepcopy(model)
-
-    # --- Mamba layers ---
-    for i, block in enumerate(model_nn.mamba_layers):
-        if isinstance(block, MambaBlock):
-            model_nn.mamba_layers[i] = NNMambaBlock(
-                block, a_min=a_min, a_max=a_max,
-            )
-        else:
-            warnings.warn(
-                f"mamba_layers[{i}] is {type(block).__name__}, not MambaBlock — skipped."
-            )
-            
-    # --- Head ---
-    if model_nn.head is not None:
-        if isinstance(model_nn.head, nn.Sequential):
-            model_nn.head = _replace_head_linears(model_nn.head, a_min=a_min, a_max=a_max)
-        elif isinstance(model_nn.head, nn.Linear):
-            model_nn.head = IsomorphicLinear(model_nn.head, a_min=a_min, a_max=a_max)
-        else:
-            warnings.warn(
-                f"head is {type(model_nn.head).__name__}, not Sequential or Linear — skipped."
-            )
-
+    _transform_in_place(model_nn, a_min, a_max)
     return model_nn

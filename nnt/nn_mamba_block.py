@@ -128,5 +128,5 @@ class NNMambaBlock(nn.Module):
         y = self._apply_bound(
             rearrange(y, "b d l -> b l d")
         )
-        out = self.out_proj(y)
+        out = self._apply_bound(self.out_proj(y))
         return out

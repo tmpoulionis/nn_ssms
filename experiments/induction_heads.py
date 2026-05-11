@@ -69,6 +69,27 @@ config = {
             "warmup": 0.4
         }
     },
+    "quantization": {
+        "enabled": False,
+        "weight_bits": 6,
+        "activation_bits": 6,
+        "weights_symmetric": True,
+        "activations_symmetric": False,
+        "per_channel_weights": True,
+        "observer_momentum": 0.01,
+        "calibration_steps": 500,
+        "freeze_observer_step": None,
+        "quantize_embeddings": False,
+        "skip_modules": ["norm"],
+        "tensors": {
+            "input": True,
+            "weight": True,
+            "bias": True,
+            "output": True,
+        },
+        "train_quant": True,
+        "eval_quant": True,
+    },
     "seed": 42,
     "wandb": {
         "project": None,
