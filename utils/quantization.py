@@ -154,11 +154,126 @@ class LayerQuantWrap(nn.Module):
         return output
 
 
+class IsomorphicLayerQuantWrap(nn.Module):
+    """
+    Hook-based fake-quant wrapper for nnt IsomorphicLinear / IsomorphicConv1D.
+
+    Those layers are plain nn.Modules (not nn.Linear/nn.Conv1d): they hold two
+    non-negative weights (pos/neg) plus a `b_prime` bias buffer and run two
+    functional matmuls per forward. We mirror LayerQuantWrap's save/swap/restore
+    trick over that parameter set and reuse the layer's own forward unchanged.
+    Pos/neg attribute names are probed (Linear: W_pos/W_neg_abs,
+    Conv1d: w_pos/w_neg_abs) so this stays decoupled from the nnt classes.
+    """
+
+    def __init__(self, layer: nn.Module, qcfg: dict, weight_ch_axis: int = 0):
+        super().__init__()
+        self._layer_ref = [layer]
+        self.cfg = qcfg
+        t = qcfg["tensors"]
+
+        self._pos_name = "W_pos" if hasattr(layer, "W_pos") else "w_pos"
+        self._neg_name = "W_neg_abs" if hasattr(layer, "W_neg_abs") else "w_neg_abs"
+
+        if t.get("input", True):
+            self.input_fq = make_io_fake_quant(
+                qcfg["activation_bits"],
+                qcfg["activations_symmetric"],
+                qcfg["observer_momentum"],
+            )
+        if t.get("weight", True):
+            self.w_pos_fq = make_weight_fake_quant(
+                qcfg["weight_bits"],
+                qcfg["weights_symmetric"],
+                qcfg["per_channel_weights"],
+                ch_axis=weight_ch_axis,
+            )
+            self.w_neg_fq = make_weight_fake_quant(
+                qcfg["weight_bits"],
+                qcfg["weights_symmetric"],
+                qcfg["per_channel_weights"],
+                ch_axis=weight_ch_axis,
+            )
+        if t.get("bias", True) and getattr(layer, "b_prime", None) is not None:
+            self.bias_fq = make_io_fake_quant(
+                qcfg["activation_bits"], symmetric=True, momentum=1.0
+            )
+        if t.get("output", True):
+            self.output_fq = make_io_fake_quant(
+                qcfg["activation_bits"],
+                qcfg["activations_symmetric"],
+                qcfg["observer_momentum"],
+            )
+
+        self._is_quant = False
+        self._pre_handle = None
+        self._post_handle = None
+        self._saved_pos = None
+        self._saved_neg = None
+        self._saved_bias = None
+
+    @property
+    def layer(self):
+        return self._layer_ref[0]
+
+    def forward(self, x):
+        return self.layer(x)
+
+    def set_quant_mode(self, on: bool):
+        if on and not self._is_quant:
+            self._pre_handle = self.layer.register_forward_pre_hook(self._pre_hook)
+            self._post_handle = self.layer.register_forward_hook(self._post_hook)
+            self._is_quant = True
+        elif not on and self._is_quant:
+            if self._pre_handle is not None:
+                self._pre_handle.remove()
+                self._pre_handle = None
+            if self._post_handle is not None:
+                self._post_handle.remove()
+                self._post_handle = None
+            self._is_quant = False
+
+    def _pre_hook(self, m, inputs):
+        x = inputs[0]
+        if hasattr(self, "input_fq"):
+            x = self.input_fq(x)
+        if hasattr(self, "w_pos_fq"):
+            w_pos = getattr(m, self._pos_name)
+            w_neg = getattr(m, self._neg_name)
+            self._saved_pos = w_pos.data
+            self._saved_neg = w_neg.data
+            w_pos.data = self.w_pos_fq(w_pos).detach()
+            w_neg.data = self.w_neg_fq(w_neg).detach()
+        if hasattr(self, "bias_fq") and getattr(m, "b_prime", None) is not None:
+            self._saved_bias = m.b_prime.data
+            m.b_prime.data = self.bias_fq(m.b_prime).detach()
+        return (x,) + tuple(inputs[1:])
+
+    def _post_hook(self, m, inputs, output):
+        if self._saved_pos is not None:
+            getattr(m, self._pos_name).data = self._saved_pos
+            self._saved_pos = None
+        if self._saved_neg is not None:
+            getattr(m, self._neg_name).data = self._saved_neg
+            self._saved_neg = None
+        if self._saved_bias is not None:
+            m.b_prime.data = self._saved_bias
+            self._saved_bias = None
+        if hasattr(self, "output_fq"):
+            output = self.output_fq(output)
+        return output
+
+
 class QuantizationManager(nn.Module):
-    """Owns all LayerQuantWrap instances."""
+    """Owns all per-layer fake-quant wraps (LayerQuantWrap / IsomorphicLayerQuantWrap)."""
 
     def __init__(self, model: nn.Module, qcfg: dict):
         super().__init__()
+        # Local import: keeps utils.quantization importable standalone and
+        # avoids any utils <-> nnt import cycle.
+        from nnt.nn_linear import IsomorphicLinear
+        from nnt.nn_conv1d import IsomorphicConv1D
+
         self.qcfg = qcfg
         self.wraps = nn.ModuleDict()
         skip = qcfg.get("skip_modules", [])
@@ -170,6 +285,9 @@ class QuantizationManager(nn.Module):
             if isinstance(layer, (nn.Linear, nn.Conv1d)):
                 key = name.replace(".", "__") or "_root"
                 self.wraps[key] = LayerQuantWrap(layer, qcfg, weight_ch_axis=0)
+            elif isinstance(layer, (IsomorphicLinear, IsomorphicConv1D)):
+                key = name.replace(".", "__") or "_root"
+                self.wraps[key] = IsomorphicLayerQuantWrap(layer, qcfg, weight_ch_axis=0)
             elif isinstance(layer, nn.Embedding) and quantize_embed:
                 key = name.replace(".", "__") or "_root"
                 self.wraps[key] = LayerQuantWrap(layer, qcfg, weight_ch_axis=0)
@@ -180,7 +298,7 @@ class QuantizationManager(nn.Module):
 
     def _toggle_fqs(self, method_name: str):
         for w in self.wraps.values():
-            for fq_name in ("input_fq", "weight_fq", "bias_fq", "output_fq"):
+            for fq_name in ("input_fq", "weight_fq", "w_pos_fq", "w_neg_fq", "bias_fq", "output_fq"):
                 fq = getattr(w, fq_name, None)
                 if fq is not None:
                     getattr(fq, method_name)()

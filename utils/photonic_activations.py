@@ -47,10 +47,10 @@ class PELULike(nn.Module):
         self.c = c
         self.x0 = x0
 
-        # Compute scale to match SiLU at x=10
-        silu_at_10 = 10.0 / (1.0 + math.exp(-10.0))
-        base_at_10 = b * (10 - x0) + c
-        self.scale = silu_at_10 / base_at_10
+        # # Compute scale to match SiLU at x=10
+        # silu_at_10 = 10.0 / (1.0 + math.exp(-10.0))
+        # base_at_10 = b * (10 - x0) + c
+        self.scale = 1
         
     def forward(self, x):
         out = torch.where(x>=self.x0, self.b*(x - self.x0) + self.c, self.a*(torch.exp(x - self.x0) - 1) + self.c)
