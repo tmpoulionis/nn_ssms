@@ -237,6 +237,7 @@ class IsomorphicLayerQuantWrap(nn.Module):
         x = inputs[0]
         if hasattr(self, "input_fq"):
             x = self.input_fq(x)
+            x = torch.clamp(x, -m.abs_amin, m.a_max)
         if hasattr(self, "w_pos_fq"):
             w_pos = getattr(m, self._pos_name)
             w_neg = getattr(m, self._neg_name)

@@ -151,6 +151,16 @@ def build_run_name(cfg):
 
     return name
 
+def checkpoint_dir(ckpt_type, config):
+    """./checkpoints/<type>/<project>/<name>/  — type in {'regular', 'nn', 'ft'}.
+
+    <project>/<name> come from the wandb config, so the regular/nn/ft subtrees
+    stay aligned for the same run.
+    """
+    w = config["wandb"]
+    return os.path.join("./checkpoints", ckpt_type, w["project"], w["name"])
+
+
 def create_scheduler(optimizer, total_steps, warmup=0):
     warmup_steps = int(total_steps*warmup)
     def lr_lambda(current_step):

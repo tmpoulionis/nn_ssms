@@ -1,22 +1,24 @@
 from models.mamba_cifar import CIFARMambaModel
+from models.orig_mamba_model import OrigMambaModel
 
 config = {
     "model_class": CIFARMambaModel,
     "model": {
-        "num_layers": 3,
+        "backbone_cls": OrigMambaModel,
+        "num_layers": 1,
         "d_model": 32,
         "input_dim": 33,
         "d_out": 10,
         "d_state": 8,
         "d_conv": 4,
         "expand": 2,
-        "conv_activation": "nn_pelulike_v2",
-        "delta_activation": "nn_pelulike_v2",
-        "gate_activation": "nn_pelulike_v2",
+        # "conv_activation": "nn_pelulike_v2",
+        # "delta_activation": "nn_pelulike_v2",
+        # "gate_activation": "nn_pelulike_v2",
         "use_prenorm": True,
         "use_final_norm": True,
         "mlp_dims": [32, 128, 10],
-        "mlp_act": "nn_pelulike_v2",
+        "mlp_act": "gelu",
         "use_mlp_prenorm": True,
         "out_activation": None,
         "dropout": 0.1,
@@ -47,10 +49,10 @@ config = {
     "lr_scheduler": {
         "warmup": 0.1,
     },
-    "seed": 3,
+    "seed": 1,
     "wandb": {
         "project": "cifar10",
-        "name": "d32-l3-s8 nn_pelulike_v2 batch=64",
+        "name": "d32-l1-s8 original (gelu) batch=64",
         "username": "tmpoulionis-",
         "mode": 1,
     },

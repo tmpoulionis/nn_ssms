@@ -1,17 +1,19 @@
 from models.mamba_selective_copying import SelectiveCopyingMambaModel
+from models.orig_mamba_model import OrigMambaModel
 
 config = {
     "model_class": SelectiveCopyingMambaModel,
     "model": {
+        "backbone_cls": OrigMambaModel,
         "num_layers": 2,
         "d_model": 32,
         "vocab_size": 8192,
-        "d_state": 8,
+        "d_state": 16,
         "d_conv": 4,
         "expand": 2,
-        "conv_activation": "nn_pelulike_v2",
-        "delta_activation": "nn_pelulike_v2",
-        "gate_activation": "nn_pelulike_v2",
+        # "conv_activation": "nn_pelulike_v2",
+        # "delta_activation": "nn_pelulike_v2",
+        # "gate_activation": "nn_pelulike_v2",
         "use_prenorm": True,
         "use_final_norm": True,
         "dropout": 0.0,
@@ -47,7 +49,7 @@ config = {
     "seed": 4,
     "wandb": {
         "project": "mqar2",
-        "name": "d32-l2-s8 nn_pelulike_v2 batch=64",
+        "name": "d32-l2-s16 original batch=64",
         "username": "tmpoulionis-",
         "mode": 1,
     },

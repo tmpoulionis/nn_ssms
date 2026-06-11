@@ -8,7 +8,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, Learning
 from utils.lightning import LightningMamba
 from utils.noise_injection import NoiseInjector
 
-from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config, load_config
+from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config, load_config, checkpoint_dir
 import math
 import wandb
 import time    
@@ -98,7 +98,7 @@ def train(config, resume_path=None):
     callbacks = [
         LearningRateMonitor(logging_interval='step'),
         ModelCheckpoint(
-            dirpath=f"./checkpoints/{WANDB_CONFIG['project']}/{WANDB_CONFIG['name']}",
+            dirpath=checkpoint_dir("regular", config),
             filename=checkpoint_filename,
             monitor=checkpoint_monitor,
             mode=checkpoint_mode,
@@ -107,7 +107,7 @@ def train(config, resume_path=None):
         ),
         EarlyStopping(
             monitor="val_loss",
-            patience=20,
+            patience=50,
             mode="min",
             verbose=True
         )
@@ -147,7 +147,7 @@ def train(config, resume_path=None):
     print("\n"+  "--------- Callbacks ---------")
     print(f"   ✓ Learning rate monitor")
     print(f"   ✓ Model checkpointing (save best)")
-    print(f"   ✓ Early stopping (patience=20)")
+    print(f"   ✓ Early stopping (patience=50)")
     
     print("\n"+  "--------- Data & Trainer ---------")
     print_config(DATASET_CONFIG, ["dataset_name", "batch_size"])

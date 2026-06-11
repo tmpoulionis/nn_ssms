@@ -1,24 +1,26 @@
 from models.mamba_cifar import CIFARMambaModel
+from models.orig_mamba_model import OrigMambaModel
 
 config = {
     "model_class": CIFARMambaModel,
     "model": {
-        "num_layers": 1,
+        "backbone_cls": OrigMambaModel,
+        "num_layers": 2,
         "d_model": 32,
         "d_out": 35,
         "input_dim": 64,
         "mlp_dims": [32, 64, 35],
-        "mlp_act": "nn_pelulike_v2",
+        "mlp_act": "gelu",
         "use_mlp_prenorm": True,
         "out_activation": None,
         "pooling": "mean",
         "dropout": 0.0,
-        "d_state": 4,
+        "d_state": 16,
         "d_conv": 4,
         "expand": 2,
-        "conv_activation": "silu",
-        "delta_activation": "softplus",
-        "gate_activation": "silu",
+        # "conv_activation": "silu",
+        # "delta_activation": "softplus",
+        # "gate_activation": "silu",
         "use_prenorm": True,
         "use_final_norm": True,
     },
@@ -50,7 +52,7 @@ config = {
     "seed": 1,
     "wandb": {
         "project": "speech commands",
-        "name": "d32-l1-s4 original batch=64",
+        "name": "d32-l2-s16 original (gelu) batch=64",
         "username": "tmpoulionis-",
         "mode": 1,
     },

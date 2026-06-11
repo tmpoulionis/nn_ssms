@@ -29,6 +29,7 @@ class CIFARMambaModel(nn.Module):
         out_activation: str = None,
         dropout: float = 0.1,
         pooling: str = "mean",
+        backbone_cls=MambaModel,
         **backbone_kwargs,
     ):
         super().__init__()
@@ -37,7 +38,7 @@ class CIFARMambaModel(nn.Module):
         self.pooling = pooling
 
         self.input_proj = nn.Linear(input_dim, d_model)
-        self.backbone = MambaModel(num_layers=num_layers, d_model=d_model, **backbone_kwargs)
+        self.backbone = backbone_cls(num_layers=num_layers, d_model=d_model, **backbone_kwargs)
 
         mlp_dims = mlp_dims if mlp_dims is not None else [d_model, d_out]
         assert mlp_dims[0] == d_model, "First dim in mlp_dims must be d_model."

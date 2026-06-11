@@ -21,6 +21,7 @@ class SelectiveCopyingMambaModel(nn.Module):
         num_layers: int,
         d_model: int,
         dropout: float = 0.0,
+        backbone_cls=MambaModel,
         **backbone_kwargs,
     ):
         super().__init__()
@@ -30,7 +31,7 @@ class SelectiveCopyingMambaModel(nn.Module):
 
         self.embedding = nn.Embedding(vocab_size, d_model)
         self.embed_dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        self.backbone = MambaModel(num_layers=num_layers, d_model=d_model, **backbone_kwargs)
+        self.backbone = backbone_cls(num_layers=num_layers, d_model=d_model, **backbone_kwargs)
         self.lm_head = nn.Linear(d_model, vocab_size)
 
     def forward(self, x):

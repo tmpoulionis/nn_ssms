@@ -8,6 +8,9 @@ Usage:
     python eval.py --ckpt <path> --valid --train           # + overfitting check
     python eval.py --ckpt <path> --nn                      # + NN isomorphic transform & validation
     python eval.py --ckpt <path> --nn --a_min -5 --a_max 5 # override NN transform bounds
+    python eval.py --ckpt <path> --save_nn                 # save NN isomorphic model to ./checkpoints/nn/<dataset>/<config>/ (implies --nn)
+    python eval.py --ckpt ./checkpoints/nn/<...>.ckpt      # evaluate a saved NN model (auto-detected, no flag needed)
+    python eval.py --ckpt ./checkpoints/ft/<...>.ckpt      # evaluate a finetuned NN model
     python eval.py --ckpt <path> --quant                   # PTQ at default 8-bit
     python eval.py --ckpt <path> --quant --bits 4          # sweep bit resolution (8/6/5/4/3/...)
     python eval.py --ckpt <path> --quant --calib-batches 32 # more train batches for quant calibration
@@ -15,6 +18,7 @@ Usage:
 """
 
 import argparse
+import os
 from itertools import islice
 
 import torch
@@ -24,7 +28,7 @@ import lightning as L
 import dataloaders.data as data
 from utils.lightning import LightningMamba
 from utils.quantization import QuantizationManager
-from utils.utils import model_summary
+from utils.utils import model_summary, checkpoint_dir
 from nnt.nn_conv1d import IsomorphicConv1D
 from nnt.nn_linear import IsomorphicLinear
 from nnt.transformation import transform_to_nn
@@ -128,6 +132,20 @@ def run_eval(lightning_module, trainer, loaders, args):
         trainer.validate(lightning_module, loaders["train"])
 
 
+def run_nn_validation(model_nn, loaders, q_device, quant):
+    """Forward a test batch through the non-negative model and report any violations."""
+    print("\n---------- Non-Negativity Validation ----------")
+    sample_input, _ = next(iter(loaders["test"]))
+    if quant:
+        # Lightning moves the model back to CPU after test, but the quant manager's
+        # fake-quant buffers live on q_device — re-colocate before the forward.
+        model_nn.to(q_device)
+    val_device = next(model_nn.parameters()).device
+    sample_input = sample_input.to(val_device)
+    report = validate_non_negativity(model_nn, sample_input, atol=0)
+    print(report.failures_only_summary())
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Evaluate a trained checkpoint on test/val/train, optionally via the non-negative isomorphic transform."
@@ -136,6 +154,7 @@ def main():
     parser.add_argument("--valid", action="store_true", help="Also evaluate on the validation set.")
     parser.add_argument("--train", action="store_true", help="Also evaluate on the train set.")
     parser.add_argument("--nn", action="store_true", help="Transform to non-negative isomorphic model, evaluate, and report non-negativity.")
+    parser.add_argument("--save_nn", action="store_true", help="Save the non-negative isomorphic model (Lightning ckpt) to ./checkpoints/nn/<dataset>/<config>/<same basename> (implies --nn).")
     parser.add_argument("--a_min", type=float, default=-10.0, help="a_min bound for --nn transform (default: -10).")
     parser.add_argument("--a_max", type=float, default=10.0, help="a_max bound for --nn transform (default: +10).")
     parser.add_argument("--quant", action="store_true", help="Post-training fake-quantize the model(s) before evaluation.")
@@ -162,8 +181,16 @@ def main():
     }
 
     # ------ Model + Lightning wrapper ------
+    # NN/finetuned checkpoints embed the transform bounds in their config; rebuild the
+    # isomorphic architecture before loading so eval works on regular, nn, and ft alike.
     print("Building model & loading weights...")
     model = model_cls(**config["model"])
+    nn_bounds = config.get("nn_transform")
+    is_nn_ckpt = nn_bounds is not None
+    if is_nn_ckpt:
+        print(f"Detected non-negative checkpoint (a_min={nn_bounds['a_min']}, a_max={nn_bounds['a_max']}); "
+              "rebuilding isomorphic architecture before load.")
+        model = transform_to_nn(model, **nn_bounds)
     lightning_module = LightningMamba.load_from_checkpoint(
         args.ckpt, model=model, map_location="cpu",
     )
@@ -194,17 +221,21 @@ def main():
         if args.verbose:
             print_quant_wraps(lightning_module.model, orig_mgr, qcfg, "original model")
 
-    # ------ Original model ------
+    # ------ Loaded model (original, or non-negative if an nn/ft checkpoint) ------
     print("\n" + "=" * 70)
-    print("ORIGINAL MODEL")
+    print("NON-NEGATIVE CHECKPOINT" if is_nn_ckpt else "ORIGINAL MODEL")
     print("=" * 70)
     if args.verbose:
         print("\n---------- Parameter Summary ----------")
         model_summary(lightning_module.model)
     run_eval(lightning_module, trainer, loaders, args)
+    if is_nn_ckpt:
+        run_nn_validation(lightning_module.model, loaders, q_device, args.quant)
 
-    # ------ NN isomorphic model ------
-    if args.nn:
+    # ------ NN isomorphic transform (regular checkpoints only) ------
+    if (args.nn or args.save_nn) and is_nn_ckpt:
+        print("\n[nn] checkpoint is already non-negative — ignoring --nn/--save_nn.")
+    if (args.nn or args.save_nn) and not is_nn_ckpt:
         print("\n" + "=" * 70)
         print(f"NON-NEGATIVE ISOMORPHIC MODEL  (a_min={args.a_min}, a_max={args.a_max})")
         print("=" * 70)
@@ -213,6 +244,17 @@ def main():
             lightning_module.model, a_min=args.a_min, a_max=args.a_max,
         )
         lightning_module.model = model_nn
+
+        # Save the (un-quantized) non-negative model as a Lightning checkpoint so it
+        # reloads through the same path as regular/finetuned checkpoints. The embedded
+        # nn_transform bounds let eval.py/finetune_nn.py rebuild the isomorphic model.
+        if args.save_nn:
+            lightning_module.config = {**config, "nn_transform": {"a_min": args.a_min, "a_max": args.a_max}}
+            nn_dir = checkpoint_dir("nn", config)
+            os.makedirs(nn_dir, exist_ok=True)
+            save_path = os.path.join(nn_dir, os.path.basename(args.ckpt))
+            trainer.save_checkpoint(save_path)
+            print(f"\n[save_nn] saved non-negative model -> {save_path}")
 
         if args.verbose:
             print("\n---------- Parameter Summary ----------")
@@ -230,18 +272,7 @@ def main():
                 print_quant_wraps(model_nn, nn_mgr, qcfg, "NN isomorphic model")
 
         run_eval(lightning_module, trainer, loaders, args)
-
-        # Non-negativity validation (failures-only)
-        print("\n---------- Non-Negativity Validation ----------")
-        sample_input, _ = next(iter(loaders["test"]))
-        if args.quant:
-            # Lightning moves the model back to CPU after test, but nn_mgr's
-            # fake-quant buffers live on q_device — re-colocate before the forward.
-            model_nn.to(q_device)
-        val_device = next(model_nn.parameters()).device
-        sample_input = sample_input.to(val_device)
-        report = validate_non_negativity(model_nn, sample_input, atol=0)
-        print(report.failures_only_summary())
+        run_nn_validation(model_nn, loaders, q_device, args.quant)
 
 
 if __name__ == "__main__":

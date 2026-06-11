@@ -1,0 +1,4 @@
+Collecting causal-conv1d
+  Using cached causal_conv1d-1.6.2.post1.tar.gz (29 kB)
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'error'
