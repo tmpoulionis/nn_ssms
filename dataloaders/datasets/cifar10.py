@@ -6,8 +6,8 @@ from torchvision.transforms import ToTensor, Compose, Lambda
 # standard constants for CIFAR10 normalization
 CIFAR10_STD = torch.tensor([0.2023, 0.1994, 0.2010])
 
-WINDOW = 11
-HOP = 10
+WINDOW = 8
+HOP = 8
 
 class sCIFAR10Dataset():
     def __init__(

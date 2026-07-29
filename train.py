@@ -6,7 +6,6 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from utils.lightning import LightningMamba
-from utils.noise_injection import NoiseInjector
 
 from utils.utils import set_seed, model_summary, format_time, handle_wandb_login, print_config, load_config, checkpoint_dir
 import math
@@ -37,16 +36,6 @@ def train(config, resume_path=None):
     SCHEDULER_CONFIG = config["lr_scheduler"]
     WANDB_CONFIG = config["wandb"]
     
-    noise_cfg = config.get("noise_injector")
-    if noise_cfg is not None:
-        sched = noise_cfg.get("noise_schedule", {})
-        if not sched.get("train") and not sched.get("eval"):
-            noise_cfg = None
-
-    nn_cfg = config.get("non_negative")
-    if nn_cfg is not None and not nn_cfg.get("enabled"):
-        nn_cfg = None
-
     quant_cfg = config.get("quantization")
     if quant_cfg is not None and not quant_cfg.get("enabled"):
         quant_cfg = None
@@ -121,8 +110,6 @@ def train(config, resume_path=None):
         optimizer=torch.optim.AdamW,
         lr_scheduler=SCHEDULER_CONFIG,
         opt_hyperparams=OPTIMIZER_CONFIG,
-        noise_injection=noise_cfg,
-        non_negative=nn_cfg,
         quantization=quant_cfg,
         config=config
     )

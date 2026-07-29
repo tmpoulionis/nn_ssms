@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from models.mamba_model import MambaModel
 
 
-class SelectiveCopyingMambaModel(nn.Module):
+class GenerationMambaModel(nn.Module):
     """
     Token-level language-model wrapper for the Selective Copying task.
 

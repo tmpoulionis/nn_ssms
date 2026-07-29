@@ -1,10 +1,10 @@
-from models.mamba_selective_copying import SelectiveCopyingMambaModel
-from models.orig_mamba_model import OrigMambaModel
+from models.mamba_generation import GenerationMambaModel
+from models.mamba_model import MambaModel
 
 config = {
-    "model_class": SelectiveCopyingMambaModel,
+    "model_class": GenerationMambaModel,
     "model": {
-        "backbone_cls": OrigMambaModel,
+        "backbone_cls": MambaModel,
         "num_layers": 2,
         "d_model": 32,
         "vocab_size": 8192,
@@ -49,7 +49,7 @@ config = {
     "seed": 4,
     "wandb": {
         "project": "mqar2",
-        "name": "d32-l2-s16 original batch=64",
+        "name": "d32-l2-s16 nn_pelulike_v2 batch=64",
         "username": "tmpoulionis-",
         "mode": 1,
     },

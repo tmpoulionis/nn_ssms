@@ -1,7 +1,5 @@
 from torch.nn.utils.rnn import pad_sequence
 from dataloaders.datasets.sc_dataset import SCDataset, sc_custom_collate
-from dataloaders.datasets.hg38_dataset import HG38Dataset
-from dataloaders.datasets.induction_heads import InductionHeadsDataset
 from dataloaders.datasets.selective_copying import SelectiveCopyingDataset
 from dataloaders.datasets.cifar10 import sCIFAR10Dataset
 from dataloaders.datasets.mqar import MQARDataset
@@ -43,21 +41,6 @@ DATASET_REGISTRY: Dict[str, DatasetConfig] = {
             "n_fft": 400,
             "hop_length": 150,
             "filter_labels": ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
-        }
-    ),
-    "hg38": DatasetConfig(
-        dataset_class=HG38Dataset,
-        default_params={
-            "root": "./data/hg38",
-            "max_length": 2**17,
-            "add_eos": True
-        }
-    ),
-    "induction_heads": DatasetConfig(
-        dataset_class=InductionHeadsDataset,
-        default_params={
-            "seq_len": 256,
-            "vocab_size": 16,
         }
     ),
     "selective_copying": DatasetConfig(

@@ -1,13 +1,42 @@
-__pycache__
-.vscode
-.idea
-checkpoints
-data
-wandb
-dataloaders/__pycache__
-dataloaders/datasets/__pycache__
-models/__pycache__
-utils/ __pycache__
-CLAUDE.md
-agentic_workflow/
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.so
 *.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# ---- Agent / personal notes ----
+CLAUDE.md
+.claude/
+
+# ---- Run artifacts (checkpoints, logs, downloaded datasets) ----
+checkpoints/
+wandb/
+data/
+lightning_logs/
+*.ckpt
+*.pth
+*.pt
+*.csv
+*.log
+
+# ---- Scratch / testing ----
+testing.*
+experiments/testing.py
+scratch/
+notebooks/
+*.ipynb
+models/orig_mamba_model.py
+
+# ---- Junk from malformed pip invocations (e.g. `pip install torch >=1.4.0`) ----
+=*

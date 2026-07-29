@@ -133,8 +133,6 @@ def finetune(args):
         optimizer=MAdam,            # unused (configure_optimizers is overridden), kept for hparams
         lr_scheduler=None,          # constant lr_out: LambdaLR can't drive MAdam's lr_out
         opt_hyperparams={},
-        non_negative=None,
-        noise_injection=None,
         quantization=None,
         config=config,
         madam_kwargs=madam_kwargs,

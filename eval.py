@@ -35,8 +35,8 @@ from nnt.transformation import transform_to_nn
 from nnt.validate_nn import validate_non_negativity
 
 
-# Fallback quant config when the checkpoint carries none. Modeled on
-# experiments/induction_heads.py; bit widths are filled in by build_qcfg().
+# Fallback quant config when the checkpoint carries none.
+# Bit widths are filled in by build_qcfg().
 _DEFAULT_QCFG = {
     "enabled": True,
     "weights_symmetric": False,
